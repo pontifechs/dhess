@@ -1,0 +1,5 @@
+name "dhess"
+description "A chess engine in D."
+copyright "Copyright © 2016, matt"
+authors "matt"
+targetType "library"
