@@ -274,8 +274,8 @@ public:
                       marchCollisions(rook, &east) |
                       marchCollisions(rook, &south) |
                       marchCollisions(rook, &west)) & enemy!c;
-      auto all = moves | attacks;
 
+      auto all = moves | attacks;
       while (all > 0)
       {
         auto dest = all.LS1B;
@@ -350,12 +350,12 @@ public:
         marchMoves(queen, &northwest);
 
       auto collisions = (marchCollisions(queen, &north) |
-        marchCollisions(queen, &northeast) |
-        marchCollisions(queen, &east) |
-        marchCollisions(queen, &southeast) |
-        marchCollisions(queen, &south) |
-        marchCollisions(queen, &southwest) |
-        marchCollisions(queen, &west) |
+                         marchCollisions(queen, &northeast) |
+                         marchCollisions(queen, &east) |
+                         marchCollisions(queen, &southeast) |
+                         marchCollisions(queen, &south) |
+                         marchCollisions(queen, &southwest) |
+                         marchCollisions(queen, &west) |
                          marchCollisions(queen, &northwest)) & enemy!c;
 
       auto all = moves | collisions;
@@ -372,9 +372,20 @@ public:
 
     return ret;
   }
+
+  // All --------------------------------------------------------------------------------------
+  Move[] moves(Color c)()
+  {
+    return moves!(c, Piece.Pawn) ~
+      moves!(c, Piece.Knight) ~
+      moves!(c, Piece.King) ~
+      moves!(c, Piece.Bishop) ~
+      moves!(c, Piece.Rook) ~
+      moves!(c, Piece.Queen);
+  }
 }
 
-  // Build from FEN
+// Build from FEN
 unittest
 {
   Board board = Board();
@@ -549,7 +560,6 @@ unittest
 unittest
 {
   import std.algorithm;
-  import std.stdio;
 
   auto fen = "8/3p4/8/3R4/3P4/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -574,7 +584,6 @@ unittest
 unittest
 {
   import std.algorithm;
-  import std.stdio;
 
   auto fen = "8/5p2/8/3B4/2P5/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -600,7 +609,6 @@ unittest
 unittest
 {
   import std.algorithm;
-  import std.stdio;
 
   auto fen = "8/5p2/8/3Q4/2P5/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -635,3 +643,39 @@ unittest
   ]);
   assert(actual == expected);
 }
+
+// All
+unittest
+{
+  import std.algorithm;
+
+  auto board = Board();
+  auto actual = sort(board.moves!(Color.White));
+
+  auto expected = sort([
+    Move(Piece.Pawn, Square.A2, Square.A3),
+    Move(Piece.Pawn, Square.A2, Square.A4),
+    Move(Piece.Pawn, Square.B2, Square.B3),
+    Move(Piece.Pawn, Square.B2, Square.B4),
+    Move(Piece.Pawn, Square.C2, Square.C3),
+    Move(Piece.Pawn, Square.C2, Square.C4),
+    Move(Piece.Pawn, Square.D2, Square.D3),
+    Move(Piece.Pawn, Square.D2, Square.D4),
+    Move(Piece.Pawn, Square.E2, Square.E3),
+    Move(Piece.Pawn, Square.E2, Square.E4),
+    Move(Piece.Pawn, Square.F2, Square.F3),
+    Move(Piece.Pawn, Square.F2, Square.F4),
+    Move(Piece.Pawn, Square.G2, Square.G3),
+    Move(Piece.Pawn, Square.G2, Square.G4),
+    Move(Piece.Pawn, Square.H2, Square.H3),
+    Move(Piece.Pawn, Square.H2, Square.H4),
+    Move(Piece.Knight, Square.B1, Square.A3),
+    Move(Piece.Knight, Square.B1, Square.C3),
+    Move(Piece.Knight, Square.G1, Square.F3),
+    Move(Piece.Knight, Square.G1, Square.H3),
+  ]);
+
+  assert(actual == expected);
+}
+
+

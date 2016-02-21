@@ -242,18 +242,7 @@ Bitboard east(Bitboard board)
 }
 Bitboard east(Bitboard board, int amount)
 {
-  import std.stdio;
-  Bitboard ret = 0L;
-  auto places = board.serialize;
-  foreach (index; places)
-  {
-    auto newIndex = index - amount;
-    if ((index / 8) == (newIndex / 8))
-    {
-      ret |= (1L << newIndex);
-    }
-  }
-  return ret;
+  return (board >> 1) & NOT_FILE_A;
 }
 unittest
 {
@@ -261,7 +250,8 @@ unittest
   auto two = A_8 | B_7;
   auto twoR = B_8 | C_7;
   assert(two.east == twoR);
-  assert(H_8.east == 0);
+  assert(H_8.east == 0L);
+  assert(H_1.east == 0L);
 }
 
 Bitboard west(Bitboard board)
@@ -270,18 +260,7 @@ Bitboard west(Bitboard board)
 }
 Bitboard west(Bitboard board, int amount = 1)
 {
-  import std.stdio;
-  Bitboard ret = 0L;
-  auto places = board.serialize;
-  foreach (index; places)
-  {
-    auto newIndex = index + amount;
-    if ((index / 8) == (newIndex / 8))
-    {
-      ret |= (1L << newIndex);
-    }
-  }
-  return ret;
+  return (board << 1) & NOT_FILE_H;
 }
 unittest
 {
