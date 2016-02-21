@@ -223,6 +223,155 @@ public:
 
     return ret;
   }
+  // Sliding -------------------------------------------------------------------
+  alias MoveBitboard = Bitboard function(Bitboard);
+  Bitboard marchMoves(Bitboard board, MoveBitboard move)
+  {
+    auto moves = 0L;
+    auto march = board;
+    for (int i = 0; i < 7; ++i)
+    {
+      march = move(march);
+      march = march.remove(march & all);
+      moves |= march;
+    }
+    return moves;
+  }
+
+  Bitboard marchCollisions(Bitboard board, MoveBitboard move)
+  {
+    auto attacks = 0L;
+    auto march = board;
+    for (int i = 0; i < 7; ++i)
+    {
+      march = move(march);
+      attacks |= march & all;
+      march = march.remove(march & all);
+    }
+    return attacks;
+  }
+
+
+  // Rooks ---------------------------------------------------------------------------------------
+  Move[] moves(Color c, Piece p)()
+    if (p == Piece.Rook)
+  {
+    Move[] ret = [];
+
+    auto rooks = boards[c][p];
+
+    while (rooks > 0)
+    {
+      auto sq = rooks.LS1B;
+      Bitboard rook = (1L << sq);
+
+      auto moves = marchMoves(rook, &north) |
+        marchMoves(rook, &east) |
+        marchMoves(rook, &south) |
+        marchMoves(rook, &west);
+
+      auto attacks = (marchCollisions(rook, &north) |
+                      marchCollisions(rook, &east) |
+                      marchCollisions(rook, &south) |
+                      marchCollisions(rook, &west)) & enemy!c;
+      auto all = moves | attacks;
+
+      while (all > 0)
+      {
+        auto dest = all.LS1B;
+        ret ~= Move(Piece.Rook, sq, dest);
+        all = all.resetLS1B;
+      }
+
+      rooks = rooks.resetLS1B;
+    }
+
+    return ret;
+  }
+
+
+  // Bishops ----------------------------------------------------------------------------------
+  Move[] moves(Color c, Piece p)()
+    if (p == Piece.Bishop)
+  {
+    Move[] ret = [];
+
+    auto bishops = boards[c][p];
+
+    while (bishops > 0)
+    {
+      auto source = bishops.LS1B;
+      auto bishop = (1L << source);
+
+      auto moves = marchMoves(bishop, &northeast) |
+        marchMoves(bishop, &southeast) |
+        marchMoves(bishop, &southwest) |
+        marchMoves(bishop, &northwest);
+
+      auto attacks = (marchCollisions(bishop, &northeast) |
+                      marchCollisions(bishop, &southeast) |
+                      marchCollisions(bishop, &southwest) |
+                      marchCollisions(bishop, &northwest)) & enemy!c;
+      auto all = moves | attacks;
+
+      while (all > 0)
+      {
+        auto dest = all.LS1B;
+        ret ~= Move(Piece.Bishop, source, dest);
+        all = all.resetLS1B;
+      }
+
+      bishops = bishops.resetLS1B;
+    }
+
+    return ret;
+  }
+
+  // Queens --------------------------------------------------------------------------------
+  Move[] moves(Color c, Piece p)()
+    if (p == Piece.Queen)
+  {
+    Move[] ret = [];
+
+    auto queens = boards[c][p];
+
+    while (queens > 0)
+    {
+      auto source = queens.LS1B;
+      auto queen = (1L << source);
+
+      auto moves = marchMoves(queen, &north) |
+        marchMoves(queen, &northeast) |
+        marchMoves(queen, &east) |
+        marchMoves(queen, &southeast) |
+        marchMoves(queen, &south) |
+        marchMoves(queen, &southwest) |
+        marchMoves(queen, &west) |
+        marchMoves(queen, &northwest);
+
+      auto collisions = (marchCollisions(queen, &north) |
+        marchCollisions(queen, &northeast) |
+        marchCollisions(queen, &east) |
+        marchCollisions(queen, &southeast) |
+        marchCollisions(queen, &south) |
+        marchCollisions(queen, &southwest) |
+        marchCollisions(queen, &west) |
+                         marchCollisions(queen, &northwest)) & enemy!c;
+
+      auto all = moves | collisions;
+
+      while (all > 0)
+      {
+        auto dest = all.LS1B;
+        ret ~= Move(Piece.Queen, source, dest);
+        all = all.resetLS1B;
+      }
+
+      queens = queens.resetLS1B;
+    }
+
+    return ret;
+  }
 }
 
   // Build from FEN
@@ -394,4 +543,95 @@ unittest
     Move(Piece.King, Square.D5, Square.C4),
     Move(Piece.King, Square.D5, Square.C5)
   ]);
+}
+
+// Rook
+unittest
+{
+  import std.algorithm;
+  import std.stdio;
+
+  auto fen = "8/3p4/8/3R4/3P4/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Rook));
+
+  auto expected = sort([
+    Move(Piece.Rook, Square.D5, Square.A5),
+    Move(Piece.Rook, Square.D5, Square.B5),
+    Move(Piece.Rook, Square.D5, Square.C5),
+    Move(Piece.Rook, Square.D5, Square.D6),
+    Move(Piece.Rook, Square.D5, Square.D7),
+    Move(Piece.Rook, Square.D5, Square.E5),
+    Move(Piece.Rook, Square.D5, Square.F5),
+    Move(Piece.Rook, Square.D5, Square.G5),
+    Move(Piece.Rook, Square.D5, Square.H5),
+  ]);
+
+  assert(actual == expected);
+}
+
+// Bishop
+unittest
+{
+  import std.algorithm;
+  import std.stdio;
+
+  auto fen = "8/5p2/8/3B4/2P5/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Bishop));
+
+  auto expected = sort([
+    Move(Piece.Bishop, Square.D5, Square.A8),
+    Move(Piece.Bishop, Square.D5, Square.B7),
+    Move(Piece.Bishop, Square.D5, Square.C6),
+    Move(Piece.Bishop, Square.D5, Square.E6),
+    Move(Piece.Bishop, Square.D5, Square.F7),
+    Move(Piece.Bishop, Square.D5, Square.E4),
+    Move(Piece.Bishop, Square.D5, Square.F3),
+    Move(Piece.Bishop, Square.D5, Square.G2),
+    Move(Piece.Bishop, Square.D5, Square.H1),
+  ]);
+  assert(actual == expected);
+}
+
+
+
+// Queen
+unittest
+{
+  import std.algorithm;
+  import std.stdio;
+
+  auto fen = "8/5p2/8/3Q4/2P5/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Queen));
+
+  auto expected = sort([
+    // Bishop-y
+    Move(Piece.Queen, Square.D5, Square.A8),
+    Move(Piece.Queen, Square.D5, Square.B7),
+    Move(Piece.Queen, Square.D5, Square.C6),
+    Move(Piece.Queen, Square.D5, Square.E6),
+    Move(Piece.Queen, Square.D5, Square.F7),
+    Move(Piece.Queen, Square.D5, Square.E4),
+    Move(Piece.Queen, Square.D5, Square.F3),
+    Move(Piece.Queen, Square.D5, Square.G2),
+    Move(Piece.Queen, Square.D5, Square.H1),
+    // Rook-y
+    Move(Piece.Queen, Square.D5, Square.A5),
+    Move(Piece.Queen, Square.D5, Square.B5),
+    Move(Piece.Queen, Square.D5, Square.C5),
+    Move(Piece.Queen, Square.D5, Square.E5),
+    Move(Piece.Queen, Square.D5, Square.F5),
+    Move(Piece.Queen, Square.D5, Square.G5),
+    Move(Piece.Queen, Square.D5, Square.H5),
+    Move(Piece.Queen, Square.D5, Square.D1),
+    Move(Piece.Queen, Square.D5, Square.D2),
+    Move(Piece.Queen, Square.D5, Square.D3),
+    Move(Piece.Queen, Square.D5, Square.D4),
+    Move(Piece.Queen, Square.D5, Square.D6),
+    Move(Piece.Queen, Square.D5, Square.D7),
+    Move(Piece.Queen, Square.D5, Square.D8),
+  ]);
+  assert(actual == expected);
 }
