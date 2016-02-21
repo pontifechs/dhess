@@ -1,9 +1,10 @@
-module chess.Board;
+module dhess.Board;
 
-import chess.Pieces;
-import chess.Position;
-import chess.Bitboard;
-import chess.FEN;
+import dhess.Pieces;
+import dhess.Position;
+import dhess.Bitboard;
+import dhess.FEN;
+import dhess.Move;
 
 struct Board
 {
@@ -58,8 +59,8 @@ struct Board
     return b;
   }
 
-  // Utilities
-  // Pawns ----------------------------------------------------------------------------------
+private:
+  // Selection
   Bitboard all(Color color)()
   {
     return kings[color] | queens[color] | bishops[color] | knights[color] | rooks[color] | pawns[color];
@@ -76,25 +77,26 @@ struct Board
   }
 
   // Move generation:
-  private Bitboard pawnPush(Color c)()
+  // Pawns ----------------------------------------------------------------------------------
+  Bitboard pawnPush(Color c)()
     if (c == Color.White)
   {
     return pawns[c].north.remove(all);
   }
 
-  private Bitboard pawnPush(Color c)()
+  Bitboard pawnPush(Color c)()
     if (c == Color.Black)
   {
     return pawns[c].south.remove(all);
   }
 
-  private Bitboard pawnDoublePush(Color c)()
+  Bitboard pawnDoublePush(Color c)()
     if (c == Color.White)
   {
     return pawnPush!(c).north.remove(all);
   }
 
-  private Bitboard pawnDoublePush(Color c)()
+  Bitboard pawnDoublePush(Color c)()
     if (c == Color.Black)
   {
     return pawnPush!(c).south.remove(all);
@@ -113,7 +115,7 @@ struct Board
   }
 
   // Knights -----------------------------------------------------------------------------
-  private Bitboard knightPossibleMoves(Color c)()
+  Bitboard knightPossibleMoves(Color c)()
   {
     auto eastNorth = knights[c].northeast.north;
     auto eastNorthEast = knights[c].northeast.east;
@@ -140,7 +142,7 @@ struct Board
   }
 
   // Kings --------------------------------------------------------------
-  private Bitboard kingPossibleMoves(Color c)()
+  Bitboard kingPossibleMoves(Color c)()
   {
     auto ret = 0L;
     ret |= kings[c].north;
@@ -166,7 +168,7 @@ struct Board
 
   // Sliding -------------------------------------------------------------------
   alias Move = Bitboard function(Bitboard);
-  private Bitboard marchMoves(Bitboard board, Move move)
+  Bitboard marchMoves(Bitboard board, Move move)
   {
     auto moves = 0L;
     auto march = board;
@@ -179,7 +181,7 @@ struct Board
     return moves;
   }
 
-  private Bitboard marchCollisions(Bitboard board, Move move)
+  Bitboard marchCollisions(Bitboard board, Move move)
   {
     auto attacks = 0L;
     auto march = board;
@@ -252,6 +254,16 @@ struct Board
       marchCollisions(queens[c], &west) |
       marchCollisions(queens[c], &northwest);
     return collisions & enemy!c;
+  }
+
+  Bitboard attacks(Color c)()
+  {
+    return pawnAttacks!c | knightAttacks!c | kingAttacks!c | rookAttacks!c | bishopAttacks!c | queenAttacks!c;
+  }
+
+  bool inCheck(Color c)()
+  {
+    return (attacks!c & kings[not!c]) != 0;
   }
 }
 
@@ -470,4 +482,17 @@ unittest
   FEN surroundedFEN = "8/8/8/2ppp3/2pQp3/2ppp3/8/8 w KQkq - 0 1";
   Board surrounded = Board(surroundedFEN);
   assert(surrounded.queenAttacks!(Color.White) == (C_5 | D_5 | E_5 | C_4 | E_4 | C_3 | D_3 | E_3));
+}
+
+// inCheck
+unittest
+{
+  auto neutral = Board();
+  assert(!neutral.inCheck!(Color.Black));
+  assert(!neutral.inCheck!(Color.White));
+
+  auto bothInCheckFEN =  "rnbqkb1r/pppppppp/3N4/8/8/3n4/PPPPPPPP/RNBQKB1R w KQkq - 0 1";
+  auto bothInCheck = Board(bothInCheckFEN);
+  assert(bothInCheck.inCheck!(Color.Black));
+  assert(bothInCheck.inCheck!(Color.White));
 }

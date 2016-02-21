@@ -1,6 +1,6 @@
-module chess.Bitboard;
+module dhess.Bitboard;
 
-import chess.Position;
+import dhess.Position;
 
 alias Bitboard = ulong;
 
@@ -163,7 +163,7 @@ unittest
   assert(RANK_1.south == 0L);
 }
 
-ubyte LS1B(Bitboard board)
+Square LS1B(Bitboard board)
 {
   asm
   {
@@ -177,7 +177,7 @@ unittest
   assert(A_8.LS1B == 63);
 }
 
-ubyte MS1B(Bitboard board)
+Square MS1B(Bitboard board)
 {
   asm
   {
@@ -201,24 +201,39 @@ unittest
   assert(two.resetLS1B.resetLS1B == 0);
 }
 
-ubyte[] serialize(Bitboard board)
+Square[] serialize(Bitboard board)
 {
-  ubyte[] ret;
+  import std.conv;
+  Square[] ret;
   while (board)
   {
-    ret ~= board.LS1B;
+    ret ~= board.LS1B.to!Square;
     board = board.resetLS1B;
   }
   return ret;
 }
 unittest
 {
-  import std.stdio;
+  import std.algorithm;
   auto rank1 = RANK_1.serialize;
-  assert(rank1 == [0,1,2,3,4,5,6,7]);
+  assert(rank1 == [Square.H1,
+                   Square.G1,
+                   Square.F1,
+                   Square.E1,
+                   Square.D1,
+                   Square.C1,
+                   Square.B1,
+                   Square.A1]);
 
   auto fileA = FILE_A.serialize;
-  assert(fileA == [7, 15, 23, 31, 39, 47, 55, 63]);
+  assert(fileA == [Square.A1,
+                   Square.A2,
+                   Square.A3,
+                   Square.A4,
+                   Square.A5,
+                   Square.A6,
+                   Square.A7,
+                   Square.A8]);
 }
 
 Bitboard east(Bitboard board)
@@ -279,7 +294,7 @@ unittest
 
 Bitboard remove(Bitboard lhs, Bitboard rhs)
 {
-  return lhs & (lhs ^ (lhs & rhs));
+  return lhs & ~rhs;
 }
 unittest
 {

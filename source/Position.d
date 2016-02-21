@@ -1,7 +1,7 @@
-module chess.Position;
+module dhess.Position;
 
 
-enum Row: uint
+enum Row: ubyte 
 {
   _1 = 0,
   _2 = 1,
@@ -13,7 +13,7 @@ enum Row: uint
   _8 = 7
 }
 
-enum Column: uint
+enum Column: ubyte
 {
   A = 7,
   B = 6,
@@ -22,7 +22,34 @@ enum Column: uint
   E = 3,
   F = 2,
   G = 1,
-  H = 0 
+  H = 0
 }
 
+mixin(genSquareEnum());
 
+private string genSquareEnum()
+{
+  import std.conv;
+
+  auto ret = "enum Square: ubyte {\n";
+
+  for (int row = 0; row < 8; ++row)
+  {
+    for (int col = 0; col < 8; ++col)
+    {
+      Column colEnum = to!Column(col);
+      auto name = colEnum.to!string ~ (row + 1).to!string ;
+      auto value = (row * 8 + col).to!string;
+      ret ~= "\t" ~ name ~ " = " ~ value ~ ",\n";
+    }
+  }
+
+  ret ~= "}";
+  return ret;
+}
+
+unittest
+{
+  assert(Square.A1 == 7);
+  assert(Square.A8 == 63);
+}

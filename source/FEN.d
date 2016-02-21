@@ -1,10 +1,10 @@
-module chess.FEN;
+module dhess.FEN;
 
 import std.array;
 import std.typecons;
 
-import chess.Pieces;
-import chess.Position;
+import dhess.Pieces;
+import dhess.Position;
 
 alias FEN = string;
 
@@ -381,7 +381,6 @@ unittest
 {
   assert(START.valid);
 }
-
 
 // parse board
 unittest

@@ -1,4 +1,4 @@
-module chess.Pieces;
+module dhess.Pieces;
 
 
 enum Piece
