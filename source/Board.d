@@ -6,14 +6,11 @@ import dhess.Bitboard;
 import dhess.FEN;
 import dhess.Move;
 
+import std.conv;
+
 struct Board
 {
-  Bitboard[2] kings;
-  Bitboard[2] queens;
-  Bitboard[2] bishops;
-  Bitboard[2] knights;
-  Bitboard[2] rooks;
-  Bitboard[2] pawns;
+  Bitboard[6][2] boards;
 
 
   static Board opCall(FEN fen = START)
@@ -32,258 +29,219 @@ struct Board
           continue;
         }
         auto pos = position(col, row);
-        auto color = piece.color;
-        final switch (piece.piece)
-        {
-        case Piece.King:
-          b.kings[color]|= pos;
-          break;
-        case Piece.Queen:
-          b.queens[color] |= pos;
-          break;
-        case Piece.Bishop:
-          b.bishops[color] |= pos;
-          break;
-        case Piece.Knight:
-          b.knights[color] |= pos;
-          break;
-        case Piece.Rook:
-          b.rooks[color] |= pos;
-          break;
-        case Piece.Pawn:
-          b.pawns[color] |= pos;
-          break;
-        }
+        b.boards[piece.color][piece.piece] |= pos;
       }
     }
     return b;
   }
 
 private:
-  // Selection
-  Bitboard all(Color color)()
-  {
-    return kings[color] | queens[color] | bishops[color] | knights[color] | rooks[color] | pawns[color];
-  }
-
   Bitboard all()
   {
-    return all!(Color.Black) | all!(Color.White);
+    return all!(Color.White) | all!(Color.Black);
   }
 
-  Bitboard enemy(Color color)()
+  Bitboard empty()
   {
-    return all!(not!color);
+    return ~all();
   }
 
-  // Move generation:
-  // Pawns ----------------------------------------------------------------------------------
-  Bitboard pawnPush(Color c)()
-    if (c == Color.White)
+  Bitboard all(Color c)()
   {
-    return pawns[c].north.remove(all);
+    auto all = 0L;
+    foreach (b; boards[c])
+    {
+      all |= b;
+    }
+    return all;
   }
 
-  Bitboard pawnPush(Color c)()
-    if (c == Color.Black)
+  Bitboard enemy(Color c)()
   {
-    return pawns[c].south.remove(all);
+    return all!(not!c);
   }
 
-  Bitboard pawnDoublePush(Color c)()
-    if (c == Color.White)
-  {
-    return pawnPush!(c).north.remove(all);
-  }
 
-  Bitboard pawnDoublePush(Color c)()
-    if (c == Color.Black)
-  {
-    return pawnPush!(c).south.remove(all);
-  }
+public:
 
-  Bitboard pawnMoves(Color color)()
+  // Pawns -------------------------------------------------------------------------------------------
+  Move[] moves(Color color, Piece piece)()
+    if (piece == Piece.Pawn)
   {
-    return pawnPush!color | pawnPush!color;
-  }
+    enum pushDirection = (color == Color.White) ? 8 : -8;
+    enum westAttackDirection = (color == Color.White) ? 9 : -7;
+    enum eastAttackDirection = (color == Color.White) ? 7 : -9;
 
-  Bitboard pawnAttacks(Color color)()
-  {
-    auto westAttacks = pawns[color].northwest & enemy!color;
-    auto eastAttacks = pawns[color].northeast & enemy!color;
-    return westAttacks | eastAttacks;
-  }
+    Move[] ret = [];
 
-  // Knights -----------------------------------------------------------------------------
-  Bitboard knightPossibleMoves(Color c)()
-  {
-    auto eastNorth = knights[c].northeast.north;
-    auto eastNorthEast = knights[c].northeast.east;
-    auto eastSouthEast = knights[c].southeast.east;
-    auto eastSouth = knights[c].southeast.south;
-    auto westNorth = knights[c].northwest.north;
-    auto westNorthWest = knights[c].northwest.west;
-    auto westSouthWest = knights[c].southwest.west;
-    auto westSouth = knights[c].southwest.south;
+    // Single pushes
+    static if (color == Color.White)
+    {
+      auto singles = (boards[color][piece].north & empty).remove(RANK_8);
+    }
+    else
+    {
+      auto singles = (boards[color][piece].south & empty).remove(RANK_1);
+    }
 
-    auto allPossible = eastNorth | eastNorthEast | eastSouthEast | eastSouth;
-    allPossible |= westNorth | westNorthWest | westSouthWest | westSouth;
-    return allPossible;
-  }
+    // Double pushes
+    static if (color == Color.White)
+    {
+      auto doubles = (singles & RANK_3).north & empty;
+    }
+    else
+    {
+      auto doubles = (singles & RANK_6).south & empty;
+    }
 
-  Bitboard knightMoves(Color c)()
-  {
-    return knightPossibleMoves!(c).remove(all);
-  }
 
-  Bitboard knightAttacks(Color c)()
-  {
-    return knightPossibleMoves!c & enemy!c;
-  }
+    while (singles > 0)
+    {
+      auto sq = singles.LS1B;
+      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq);
+      singles = singles.resetLS1B;
+    }
 
-  // Kings --------------------------------------------------------------
-  Bitboard kingPossibleMoves(Color c)()
-  {
-    auto ret = 0L;
-    ret |= kings[c].north;
-    ret |= kings[c].northeast;
-    ret |= kings[c].east;
-    ret |= kings[c].southeast;
-    ret |= kings[c].south;
-    ret |= kings[c].southwest;
-    ret |= kings[c].west;
-    ret |= kings[c].northwest;
+    while (doubles > 0)
+    {
+      auto sq = doubles.LS1B;
+      ret ~= Move(Piece.Pawn, (sq - 2*pushDirection).to!Square, sq);
+      doubles = doubles.resetLS1B;
+    }
+
+
+    // Attacks
+    static if (color == Color.White)
+    {
+      auto westAttacks = boards[color][piece].northwest & enemy!color;
+      auto eastAttacks = boards[color][piece].northeast & enemy!color;
+    }
+    else
+    {
+      auto westAttacks = boards[color][piece].southwest & enemy!color;
+      auto eastAttacks = boards[color][piece].southeast & enemy!color;
+    }
+
+    // West attacks
+    while (westAttacks > 0)
+    {
+
+      auto sq = westAttacks.LS1B;
+      ret ~= Move(Piece.Pawn, (sq - westAttackDirection).to!Square, sq);
+      westAttacks = westAttacks.resetLS1B;
+    }
+
+    // east attacks
+    while (eastAttacks > 0)
+    {
+      auto sq = eastAttacks.LS1B;
+      ret ~= Move(Piece.Pawn, (sq - eastAttackDirection).to!Square, sq);
+      eastAttacks = eastAttacks.resetLS1B;
+    }
+
+
+    // Pawn promotions
+    static if (color == Color.White)
+    {
+      auto promotions = (boards[color][piece].north & empty & RANK_8);
+    }
+    else
+    {
+      auto promotions = (boards[color][piece].south & empty & RANK_1);
+    }
+
+    while (promotions > 0)
+    {
+      auto sq = promotions.LS1B;
+      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Queen);
+      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Bishop);
+      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Knight);
+      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Rook);
+      promotions = promotions.resetLS1B;
+    }
+
     return ret;
   }
 
-  Bitboard kingMoves(Color c)()
+  // Knights ---------------------------------------------------------------------------------------
+  Move[] moves(Color c, Piece p)()
+    if (p == Piece.Knight)
   {
-    return kingPossibleMoves!(c).remove(all);
-  }
+    Move[] ret = [];
 
-  Bitboard kingAttacks(Color c)()
-  {
-    return kingPossibleMoves!c & enemy!c;
-  }
-
-  // Sliding -------------------------------------------------------------------
-  alias Move = Bitboard function(Bitboard);
-  Bitboard marchMoves(Bitboard board, Move move)
-  {
-    auto moves = 0L;
-    auto march = board;
-    for (int i = 0; i < 7; ++i)
+    auto knights = boards[c][p];
+    while (knights > 0)
     {
-      march = move(march);
-      march = march.remove(march & all);
-      moves |= march;
+      auto source = knights.LS1B;
+      Bitboard knight = (1L << source);
+      auto knightMoves = (knight.northeast.north |
+                          knight.northeast.east |
+                          knight.southeast.east |
+                          knight.southeast.south |
+                          knight.southwest.south |
+                          knight.southwest.west |
+                          knight.northwest.west |
+                          knight.northwest.north) & (empty | enemy!c);
+
+      while (knightMoves > 0)
+      {
+        auto dest = knightMoves.LS1B;
+        ret ~= Move(Piece.Knight, source, dest);
+        knightMoves = knightMoves.resetLS1B;
+      }
+
+      knights = knights.resetLS1B;
     }
-    return moves;
+
+    return ret;
   }
 
-  Bitboard marchCollisions(Bitboard board, Move move)
+  // King ---------------------------------------------------------------------------------------
+  Move[] moves(Color c, Piece p)()
+    if (p == Piece.King)
   {
-    auto attacks = 0L;
-    auto march = board;
-    for (int i = 0; i < 7; ++i)
+    Move[] ret = [];
+
+    auto king = boards[c][p];
+    auto source = king.LS1B;
+
+    auto possible = (king.north |
+                     king.northeast |
+                     king.east |
+                     king.southeast |
+                     king.south |
+                     king.southwest |
+                     king.west |
+                     king.northwest) & (empty | enemy!c);
+
+    while (possible > 0)
     {
-      march = move(march);
-      attacks |= march & all;
-      march = march.remove(march & all);
+      auto sq = possible.LS1B;
+      ret ~= Move(Piece.King, source, sq);
+      possible = possible.resetLS1B;
     }
-    return attacks;
-  }
 
-  // Rooks ----------------------------------------------------------------
-  Bitboard rookMoves(Color c)()
-  {
-    return marchMoves(rooks[c], &north) |
-      marchMoves(rooks[c], &east) |
-      marchMoves(rooks[c], &south) |
-      marchMoves(rooks[c], &west);
-  }
-
-  Bitboard rookAttacks(Color c)()
-  {
-    auto collisions = marchCollisions(rooks[c], &north) |
-      marchCollisions(rooks[c], &east) |
-      marchCollisions(rooks[c], &south) |
-      marchCollisions(rooks[c], &west);
-    return collisions & enemy!c;
-  }
-
-  // Bishops --------------------------------------------------------
-  Bitboard bishopMoves(Color c)()
-  {
-    return marchMoves(bishops[c], &northeast) |
-      marchMoves(bishops[c], &southeast) |
-      marchMoves(bishops[c], &southwest) |
-      marchMoves(bishops[c], &northwest);
-  }
-
-  Bitboard bishopAttacks(Color c)()
-  {
-    auto collisions = marchCollisions(bishops[c], &northeast) |
-      marchCollisions(bishops[c], &southeast) |
-      marchCollisions(bishops[c], &southwest) |
-      marchCollisions(bishops[c], &northwest);
-    return collisions & enemy!c;
-  }
-
-  // Queens ---------------------------------------------------------------
-  Bitboard queenMoves(Color c)()
-  {
-    return marchMoves(queens[c], &north) |
-      marchMoves(queens[c], &northeast) |
-      marchMoves(queens[c], &east) |
-      marchMoves(queens[c], &southeast) |
-      marchMoves(queens[c], &south) |
-      marchMoves(queens[c], &southwest) |
-      marchMoves(queens[c], &west) |
-      marchMoves(queens[c], &northwest);
-  }
-
-  Bitboard queenAttacks(Color c)()
-  {
-    auto collisions = marchCollisions(queens[c], &north) |
-      marchCollisions(queens[c], &northeast) |
-      marchCollisions(queens[c], &east) |
-      marchCollisions(queens[c], &southeast) |
-      marchCollisions(queens[c], &south) |
-      marchCollisions(queens[c], &southwest) |
-      marchCollisions(queens[c], &west) |
-      marchCollisions(queens[c], &northwest);
-    return collisions & enemy!c;
-  }
-
-  Bitboard attacks(Color c)()
-  {
-    return pawnAttacks!c | knightAttacks!c | kingAttacks!c | rookAttacks!c | bishopAttacks!c | queenAttacks!c;
-  }
-
-  bool inCheck(Color c)()
-  {
-    return (attacks!c & kings[not!c]) != 0;
+    return ret;
   }
 }
 
-// Build from FEN
+  // Build from FEN
 unittest
 {
   Board board = Board();
 
-  assert(board.pawns[Color.White] == RANK_2);
-  assert(board.pawns[Color.Black] == RANK_7);
-  assert(board.kings[Color.White] == E_1);
-  assert(board.kings[Color.Black] == E_8);
-  assert(board.queens[Color.White] == D_1);
-  assert(board.queens[Color.Black] == D_8);
-  assert(board.bishops[Color.White] == (C_1 | F_1));
-  assert(board.bishops[Color.Black] == (C_8 | F_8));
-  assert(board.knights[Color.White] == (B_1 | G_1));
-  assert(board.knights[Color.Black] == (B_8 | G_8));
-  assert(board.rooks[Color.White] == (A_1 | H_1));
-  assert(board.rooks[Color.Black] == (A_8 | H_8));
+  assert(board.boards[Color.White][Piece.Pawn] == RANK_2);
+  assert(board.boards[Color.Black][Piece.Pawn] == RANK_7);
+  assert(board.boards[Color.White][Piece.King] == E_1);
+  assert(board.boards[Color.Black][Piece.King] == E_8);
+  assert(board.boards[Color.White][Piece.Queen] == D_1);
+  assert(board.boards[Color.Black][Piece.Queen] == D_8);
+  assert(board.boards[Color.White][Piece.Bishop] == (C_1 | F_1));
+  assert(board.boards[Color.Black][Piece.Bishop] == (C_8 | F_8));
+  assert(board.boards[Color.White][Piece.Knight] == (B_1 | G_1));
+  assert(board.boards[Color.Black][Piece.Knight] == (B_8 | G_8));
+  assert(board.boards[Color.White][Piece.Rook] == (A_1 | H_1));
+  assert(board.boards[Color.Black][Piece.Rook] == (A_8 | H_8));
 }
 
 //  all black/all white
@@ -293,206 +251,147 @@ unittest
 
   assert(board.all!(Color.Black) == (RANK_7 | RANK_8));
   assert(board.all!(Color.White) == (RANK_1 | RANK_2));
+  assert(board.all == (board.all!(Color.Black) | board.all!(Color.White)));
 }
 
-// whitePawnPush
+// Empty
 unittest
 {
-  Board neutral = Board();
-  assert(neutral.pawnPush!(Color.White) == RANK_3);
+  Board board = Board();
 
-  FEN singleBlockerFEN = "rnbqkbnr/pppppppp/8/8/8/3R4/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-  Board singleBlocker = Board(singleBlockerFEN);
-  assert(singleBlocker.pawnPush!(Color.White) == (A_3 | B_3 | C_3 | E_3 | F_3 | G_3 | H_3));
-
-  FEN allBlockedFEN = "PPPPPPPP/8/8/8/8/8/8/8 w KQkq - 0 1";
-  Board allBlocked = Board(allBlockedFEN);
-  assert(allBlocked.pawnPush!(Color.White) == 0L);
+  assert(board.empty == (RANK_3 | RANK_4 | RANK_5 | RANK_6));
 }
 
-// whiteDoublePush
+// Pawn moves
 unittest
 {
-  Board neutral = Board();
-  assert(neutral.pawnDoublePush!(Color.White) == RANK_4);
+  import std.algorithm;
 
-  FEN singleBlockerFEN = "rnbqkbnr/pppppppp/8/8/8/3R4/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-  Board singleBlocker = Board(singleBlockerFEN);
-  assert(singleBlocker.pawnDoublePush!(Color.White) == (A_4 | B_4 | C_4 | E_4 | F_4 | G_4 | H_4));
+  auto fen = "8/pppppppp/3P4/4P3/8/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.Black, Piece.Pawn));
 
-  FEN twoRankBlockerFEN = "rnbqkbnr/pppppppp/8/8/2r5/3R4/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-  Board twoRankBlocker = Board(twoRankBlockerFEN);
-  assert(twoRankBlocker.pawnDoublePush!(Color.White) == (A_4 | B_4 | E_4 | F_4 | G_4 | H_4));
+  auto expected = sort([
+    // Moves
+    Move(Piece.Pawn, Square.A7, Square.A6),
+    Move(Piece.Pawn, Square.A7, Square.A5),
+    Move(Piece.Pawn, Square.B7, Square.B6),
+    Move(Piece.Pawn, Square.B7, Square.B5),
+    Move(Piece.Pawn, Square.C7, Square.C6),
+    Move(Piece.Pawn, Square.C7, Square.C5),
+    Move(Piece.Pawn, Square.E7, Square.E6),
+    Move(Piece.Pawn, Square.F7, Square.F6),
+    Move(Piece.Pawn, Square.F7, Square.F5),
+    Move(Piece.Pawn, Square.G7, Square.G6),
+    Move(Piece.Pawn, Square.G7, Square.G5),
+    Move(Piece.Pawn, Square.H7, Square.H6),
+    Move(Piece.Pawn, Square.H7, Square.H5),
 
-  FEN allBlockedFEN = "8/PPPPPPPP/8/8/8/8/8/8 w KQkq - 0 1";
-  Board allBlocked = Board(allBlockedFEN);
-  assert(allBlocked.pawnDoublePush!(Color.White) == 0L);
+    // Attacks
+    Move(Piece.Pawn, Square.C7, Square.D6),
+    Move(Piece.Pawn, Square.E7, Square.D6)
+  ]);
+
+  assert(actual == expected);
 }
 
-// whitePawnAttacks
+// Promotions
 unittest
 {
+  import std.algorithm;
 
-  FEN singleFEN = "8/8/8/8/8/p7/1P6/8 w KQkq - 0 1";
-  Board single = Board(singleFEN);
-  assert(single.pawnAttacks!(Color.White) == A_3);
+  auto fen = "8/P7/8/8/8/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Pawn));
 
-  FEN allFEN = "8/8/8/8/8/8/pppppppp/PPPPPPPP w KQkq - 0 1";
-  Board all = Board(allFEN);
-  assert(all.pawnAttacks!(Color.White) == RANK_2);
+  auto expected = sort([
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Queen),
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Bishop),
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Knight),
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Rook)
+  ]);
 
-  FEN allButOneFEN = "8/8/8/8/8/8/pppp1ppp/PPPPPPPP w KQkq - 0 1";
-  Board allButOne = Board(allButOneFEN);
-  assert(allButOne.pawnAttacks!(Color.White) == RANK_2.remove(E_2));
+  assert(actual == expected);
 }
 
-// whiteKnightMoves
+
 unittest
 {
-  FEN middleFEN = "8/8/8/8/3N4/8/8/8 w KQkq - 0 1";
-  // Knight on D4
-  Board middle = Board(middleFEN);
-  auto middleMoves = E_6 | F_5 | F_3 | E_2 | C_2 | B_3 | B_5 | C_6;
-  assert(middle.knightMoves!(Color.White)== middleMoves);
+  import std.algorithm;
 
-  FEN middleBlockedFEN = "8/8/2R1R3/1R3R2/3N4/1R3R2/2R1R3/8 w KQkq - 0 1";
-  Board middleBlocked = Board(middleBlockedFEN);
-  assert(middleBlocked.knightMoves!(Color.White) == 0L);
+  auto board = Board();
 
-  FEN cornerFEN = "8/8/8/8/8/8/8/N7 w KQkq - 0 1";
-  Board corner = Board(cornerFEN);
-  assert(corner.knightMoves!(Color.White)== (B_3 | C_2));
+  auto actual = sort(board.moves!(Color.White, Piece.Pawn));
+
+  auto expected = sort([
+    Move(Piece.Pawn, Square.A2, Square.A3),
+    Move(Piece.Pawn, Square.A2, Square.A4),
+    Move(Piece.Pawn, Square.B2, Square.B3),
+    Move(Piece.Pawn, Square.B2, Square.B4),
+    Move(Piece.Pawn, Square.C2, Square.C3),
+    Move(Piece.Pawn, Square.C2, Square.C4),
+    Move(Piece.Pawn, Square.D2, Square.D3),
+    Move(Piece.Pawn, Square.D2, Square.D4),
+    Move(Piece.Pawn, Square.E2, Square.E3),
+    Move(Piece.Pawn, Square.E2, Square.E4),
+    Move(Piece.Pawn, Square.F2, Square.F3),
+    Move(Piece.Pawn, Square.F2, Square.F4),
+    Move(Piece.Pawn, Square.G2, Square.G3),
+    Move(Piece.Pawn, Square.G2, Square.G4),
+    Move(Piece.Pawn, Square.H2, Square.H3),
+    Move(Piece.Pawn, Square.H2, Square.H4)
+  ]);
+
+  assert(actual == expected);
 }
 
-// whiteKnightAttacks
+// Knights
 unittest
 {
-  FEN middleFEN = "8/8/8/8/3N4/8/8/8 w KQkq - 0 1";
-  // Knight on D4
-  Board middle = Board(middleFEN);
-  assert(middle.knightAttacks!(Color.White) == 0L);
+  import std.algorithm;
 
-  FEN middleBlockedFEN = "8/8/2r1r3/1r3r2/3N4/1r3r2/2r1r3/8 w KQkq - 0 1";
-  Board middleBlocked = Board(middleBlockedFEN);
-  auto middleAttacks = E_6 | F_5 | F_3 | E_2 | C_2 | B_3 | B_5 | C_6;
-  assert(middleBlocked.knightAttacks!(Color.White) == middleAttacks);
+  auto fen = "8/pppppppp/8/3N4/3N4/8/PPPPPPPP/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Knight));
 
-  FEN selfAttackFEN = "8/8/2R1R3/1R3R2/3N4/1R3R2/2R1R3/8 w KQkq - 0 1";
-  Board selfAttack = Board(selfAttackFEN);
-  assert(selfAttack.knightAttacks!(Color.White) == 0L);
+  auto expected = sort([
+    // knight on d5
+    Move(Piece.Knight, Square.D5, Square.C7),
+    Move(Piece.Knight, Square.D5, Square.E7),
+    Move(Piece.Knight, Square.D5, Square.F6),
+    Move(Piece.Knight, Square.D5, Square.F4),
+    Move(Piece.Knight, Square.D5, Square.E3),
+    Move(Piece.Knight, Square.D5, Square.C3),
+    Move(Piece.Knight, Square.D5, Square.B4),
+    Move(Piece.Knight, Square.D5, Square.B6),
+
+    // Knight on d4
+    Move(Piece.Knight, Square.D4, Square.C6),
+    Move(Piece.Knight, Square.D4, Square.E6),
+    Move(Piece.Knight, Square.D4, Square.F5),
+    Move(Piece.Knight, Square.D4, Square.F3),
+    Move(Piece.Knight, Square.D4, Square.B3),
+    Move(Piece.Knight, Square.D4, Square.B5),
+  ]);
 }
 
-// whiteKingMoves / attacks
+
+// King
 unittest
 {
-  FEN middleFEN = "8/8/8/8/3K4/8/8/8 w KQkq - 0 1";
-  // King on D4
-  Board middle = Board(middleFEN);
-  auto middleMoves = C_5 | D_5 | E_5 | C_4 | E_4 | C_3 | D_3 | E_3;
-  assert(middle.kingMoves!(Color.White) == middleMoves);
-  assert(middle.kingAttacks!(Color.White) == 0L);
+  import std.algorithm;
 
-  FEN attackFEN = "8/8/8/2p1p3/3K4/2p1p3/8/8 w KQkq - 0 1";
-  Board attack = Board(attackFEN);
-  auto attackMoves = C_5 | E_5 | C_3 | E_3;
-  assert(attack.kingAttacks!(Color.White) == attackMoves);
-}
+  auto fen = "8/8/2pP4/3K4/8/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.King));
 
-// whiteRookMoves
-unittest
-{
-  FEN middleFEN = "8/pppppppp/8/8/3R4/8/8/8 w KQkq - 0 1";
-  Board middle = Board(middleFEN);
-  auto moves = A_4 | B_4 | C_4 | E_4 | F_4 | G_4 | G_4 | H_4 | D_1 | D_2 | D_3 | D_5 | D_6;
-  assert(middle.rookMoves!(Color.White) == moves);
-
-  FEN surroundedFEN = "8/8/8/3p4/2pRp3/3p4/8/8 w KQkq - 0 1";
-  Board surrounded = Board(surroundedFEN);
-  assert(surrounded.rookMoves!(Color.White) == 0L);
-}
-
-// whiteRookAttacks
-unittest
-{
-  FEN middleFEN = "8/pppppppp/8/8/3R4/8/8/8 w KQkq - 0 1";
-  Board middle = Board(middleFEN);
-  assert(middle.rookAttacks!(Color.White) == D_7);
-
-  FEN surroundedFEN = "8/8/8/3p4/2pRp3/3p4/8/8 w KQkq - 0 1";
-  Board surrounded = Board(surroundedFEN);
-  assert(surrounded.rookAttacks!(Color.White) == (C_4 | D_5 | D_3 | E_4));
-
-  FEN longShotFEN = "p7/8/8/8/8/8/8/R6p w KQkq - 0 1";
-  Board longShot = Board(longShotFEN);
-  assert(longShot.rookAttacks!(Color.White) == (A_8 | H_1));
-}
-
-// whiteBishopMoves
-unittest
-{
-  FEN middleFEN ="8/pppppppp/8/8/3B4/8/8/8 w KQkq - 0 1";
-  Board middle = Board(middleFEN);
-  auto middleMoves = C_5 | B_6 | E_5 | F_6 | C_3 | B_2 | A_1 | E_3 | F_2 | G_1;
-  assert(middle.bishopMoves!(Color.White) == middleMoves);
-
-  FEN surroundedFEN = "8/8/8/2p1p3/3B4/2p1p3/8/8 w KQkq - 0 1";
-  Board surrounded = Board(surroundedFEN);
-  assert(surrounded.bishopMoves!(Color.White)== 0L);
-}
-
-// whiteBishopAttacks
-unittest
-{
-  FEN middleFEN ="8/pppppppp/8/8/3B4/8/8/8 w KQkq - 0 1";
-  Board middle = Board(middleFEN);
-  auto middleAttacks = A_7 | G_7;
-  assert(middle.bishopAttacks!(Color.White) == middleAttacks);
-
-  FEN surroundedFEN = "8/8/8/2p1p3/3B4/2p1p3/8/8 w KQkq - 0 1";
-  Board surrounded = Board(surroundedFEN);
-  assert(surrounded.bishopAttacks!(Color.White) == (C_5 | E_5 | C_3 | E_3));
-}
-
-// whiteQueenMoves
-unittest
-{
-  FEN middleFEN ="8/pppppppp/8/8/3Q4/8/8/8 w KQkq - 0 1";
-  Board middle = Board(middleFEN);
-
-  auto middleRookMoves = A_4 | B_4 | C_4 | E_4 | F_4 | G_4 | G_4 | H_4 | D_1 | D_2 | D_3 | D_5 | D_6;
-  auto middleBishopMoves = C_5 | B_6 | E_5 | F_6 | C_3 | B_2 | A_1 | E_3 | F_2 | G_1;
-  auto middleMoves = middleRookMoves | middleBishopMoves;
-
-  assert(middle.queenMoves!(Color.White) == middleMoves);
-
-  FEN surroundedFEN = "8/8/8/2ppp3/2pQp3/2ppp3/8/8 w KQkq - 0 1";
-  Board surrounded = Board(surroundedFEN);
-
-  assert(surrounded.queenMoves!(Color.White) == 0L);
-}
-
-// whiteQueenAttacks
-unittest
-{
-  FEN middleFEN ="8/pppppppp/8/8/3Q4/8/8/8 w KQkq - 0 1";
-  Board middle = Board(middleFEN);
-
-  assert(middle.queenAttacks!(Color.White) == (A_7 | D_7 | G_7));
-
-  FEN surroundedFEN = "8/8/8/2ppp3/2pQp3/2ppp3/8/8 w KQkq - 0 1";
-  Board surrounded = Board(surroundedFEN);
-  assert(surrounded.queenAttacks!(Color.White) == (C_5 | D_5 | E_5 | C_4 | E_4 | C_3 | D_3 | E_3));
-}
-
-// inCheck
-unittest
-{
-  auto neutral = Board();
-  assert(!neutral.inCheck!(Color.Black));
-  assert(!neutral.inCheck!(Color.White));
-
-  auto bothInCheckFEN =  "rnbqkb1r/pppppppp/3N4/8/8/3n4/PPPPPPPP/RNBQKB1R w KQkq - 0 1";
-  auto bothInCheck = Board(bothInCheckFEN);
-  assert(bothInCheck.inCheck!(Color.Black));
-  assert(bothInCheck.inCheck!(Color.White));
+  auto expected = sort([
+    Move(Piece.King, Square.D5, Square.C6),
+    Move(Piece.King, Square.D5, Square.E6),
+    Move(Piece.King, Square.D5, Square.E5),
+    Move(Piece.King, Square.D5, Square.E4),
+    Move(Piece.King, Square.D5, Square.D4),
+    Move(Piece.King, Square.D5, Square.C4),
+    Move(Piece.King, Square.D5, Square.C5)
+  ]);
 }

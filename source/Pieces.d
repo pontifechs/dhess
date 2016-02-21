@@ -3,12 +3,12 @@ module dhess.Pieces;
 
 enum Piece
 {
-  King,
-  Queen,
-  Bishop,
-  Knight,
-  Rook,
-  Pawn
+  King = 0,
+  Queen = 1,
+  Bishop = 2,
+  Knight = 3,
+  Rook = 4,
+  Pawn = 5
 }
 
 enum Color: int
