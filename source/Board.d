@@ -12,6 +12,8 @@ struct Board
 {
   Bitboard[6][2] boards;
 
+  Color toMove = Color.White;
+
 
   static Board opCall(FEN fen = START)
   {
@@ -32,6 +34,9 @@ struct Board
         b.boards[piece.color][piece.piece] |= pos;
       }
     }
+
+    b.toMove = fen.activePlayer;
+
     return b;
   }
 
@@ -61,6 +66,133 @@ private:
     return all!(not!c);
   }
 
+  Bitboard attacks(Color color)()
+  {
+    // Pawns
+    static if (color == Color.White)
+    {
+      auto westAttacks = boards[color][Piece.Pawn].northwest & enemy!color;
+      auto eastAttacks = boards[color][Piece.Pawn].northeast & enemy!color;
+    }
+    else
+    {
+      auto westAttacks = boards[color][Piece.Pawn].southwest & enemy!color;
+      auto eastAttacks = boards[color][Piece.Pawn].southeast & enemy!color;
+    }
+
+    auto pawnAttacks = westAttacks | eastAttacks;
+
+    // Kings
+    auto kings = boards[color][Piece.King];
+    auto kingAttacks = (kings.north |
+                        kings.northeast |
+                        kings.east |
+                        kings.southeast |
+                        kings.south |
+                        kings.southwest |
+                        kings.west |
+                        kings.northwest) & enemy!color;
+
+    // Queens
+    auto queens = boards[color][Piece.Queen];
+    auto queenAttacks = (marchCollisions(queens, &north) |
+                         marchCollisions(queens, &northeast) |
+                         marchCollisions(queens, &east) |
+                         marchCollisions(queens, &southeast) |
+                         marchCollisions(queens, &south) |
+                         marchCollisions(queens, &southwest) |
+                         marchCollisions(queens, &west) |
+                         marchCollisions(queens, &northwest)) & enemy!color;
+
+    // Bishops
+    auto bishops = boards[color][Piece.Bishop];
+    auto bishopAttacks = (marchCollisions(bishops, &northeast) |
+                          marchCollisions(bishops, &southeast) |
+                          marchCollisions(bishops, &southwest) |
+                          marchCollisions(bishops, &northwest)) & enemy!color;
+
+    // Knights
+    auto knights = boards[color][Piece.Knight];
+    auto knightAttacks = (knights.northeast.north |
+                          knights.northeast.east |
+                          knights.southeast.east |
+                          knights.southeast.south |
+                          knights.southwest.south |
+                          knights.southwest.west |
+                          knights.northwest.west |
+                          knights.northwest.north) & enemy!color;
+
+    // Rooks
+    auto rooks = boards[color][Piece.Rook];
+    auto rookAttacks = (marchCollisions(rooks, &north) |
+                        marchCollisions(rooks, &east) |
+                        marchCollisions(rooks, &south) |
+                        marchCollisions(rooks, &west)) & enemy!color;
+
+    return (pawnAttacks |
+            kingAttacks |
+            queenAttacks |
+            bishopAttacks |
+            knightAttacks |
+            rookAttacks);
+  }
+
+  bool inCheck(Color c)()
+  {
+    return (attacks!(not!c) & boards[c][Piece.King]) > 0;
+  }
+
+  bool inCheck(Color c)
+  {
+    if (c == Color.White)
+    {
+      return inCheck!(Color.White);
+    }
+    else
+    {
+      return inCheck!(Color.Black);
+    }
+  }
+
+  Move[] moves(Color color, Piece piece)
+  {
+    if (color == Color.White)
+    {
+      final switch (piece)
+      {
+      case Piece.King:
+        return moves!(Color.White, Piece.King);
+      case Piece.Queen:
+        return moves!(Color.White, Piece.Queen);
+      case Piece.Rook:
+        return moves!(Color.White, Piece.Rook);
+      case Piece.Bishop:
+        return moves!(Color.White, Piece.Bishop);
+      case Piece.Knight:
+        return moves!(Color.White, Piece.Knight);
+      case Piece.Pawn:
+        return moves!(Color.White, Piece.Pawn);
+      }
+    }
+    else
+    {
+      final switch(piece)
+      {
+      case Piece.King:
+        return moves!(Color.Black, Piece.King);
+      case Piece.Queen:
+        return moves!(Color.Black, Piece.Queen);
+      case Piece.Rook:
+        return moves!(Color.Black, Piece.Rook);
+      case Piece.Bishop:
+        return moves!(Color.Black, Piece.Bishop);
+      case Piece.Knight:
+        return moves!(Color.Black, Piece.Knight);
+      case Piece.Pawn:
+        return moves!(Color.Black, Piece.Pawn);
+      }
+    }
+  }
 
 public:
 
@@ -223,6 +355,7 @@ public:
 
     return ret;
   }
+
   // Sliding -------------------------------------------------------------------
   alias MoveBitboard = Bitboard function(Bitboard);
   Bitboard marchMoves(Bitboard board, MoveBitboard move)
@@ -288,7 +421,6 @@ public:
 
     return ret;
   }
-
 
   // Bishops ----------------------------------------------------------------------------------
   Move[] moves(Color c, Piece p)()
@@ -383,25 +515,41 @@ public:
       moves!(c, Piece.Rook) ~
       moves!(c, Piece.Queen);
   }
-}
 
-// Build from FEN
-unittest
-{
-  Board board = Board();
+  void move(Move givenMove)
+  {
+    Bitboard source = (1L << givenMove.source);
+    Bitboard destination = (1L << givenMove.destination);
 
-  assert(board.boards[Color.White][Piece.Pawn] == RANK_2);
-  assert(board.boards[Color.Black][Piece.Pawn] == RANK_7);
-  assert(board.boards[Color.White][Piece.King] == E_1);
-  assert(board.boards[Color.Black][Piece.King] == E_8);
-  assert(board.boards[Color.White][Piece.Queen] == D_1);
-  assert(board.boards[Color.Black][Piece.Queen] == D_8);
-  assert(board.boards[Color.White][Piece.Bishop] == (C_1 | F_1));
-  assert(board.boards[Color.Black][Piece.Bishop] == (C_8 | F_8));
-  assert(board.boards[Color.White][Piece.Knight] == (B_1 | G_1));
-  assert(board.boards[Color.Black][Piece.Knight] == (B_8 | G_8));
-  assert(board.boards[Color.White][Piece.Rook] == (A_1 | H_1));
-  assert(board.boards[Color.Black][Piece.Rook] == (A_8 | H_8));
+    // Ensure the piece is where the source says it is.
+    if ((boards[toMove][givenMove.piece] & source) == 0L)
+    {
+      throw new Exception("Invalid move. No piece on: " ~ givenMove.source);
+    }
+
+    // Ensure the piece can move to the destination
+    // TODO:: Make this faster
+    Move[] possibles = moves(toMove, givenMove.piece);
+
+    if (!std.algorithm.canFind(possibles, givenMove))
+    {
+      throw new Exception("Illegal move!");
+    }
+
+    // Conditionally make the move.
+    boards[toMove][givenMove.piece] = boards[toMove][givenMove.piece].remove(source);
+    boards[toMove][givenMove.piece] = boards[toMove][givenMove.piece] | destination;
+
+    // Check if this leave the active player in check;
+    if (inCheck(toMove))
+    {
+      // Undo the move
+      boards[toMove][givenMove.piece] = boards[toMove][givenMove.piece].remove(destination);
+      boards[toMove][givenMove.piece] = boards[toMove][givenMove.piece] | source;
+
+      throw new Exception("Move leaves king in check!");
+    }
+  }
 }
 
 //  all black/all white
@@ -421,261 +569,3 @@ unittest
 
   assert(board.empty == (RANK_3 | RANK_4 | RANK_5 | RANK_6));
 }
-
-// Pawn moves
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/pppppppp/3P4/4P3/8/8/8/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.Black, Piece.Pawn));
-
-  auto expected = sort([
-    // Moves
-    Move(Piece.Pawn, Square.A7, Square.A6),
-    Move(Piece.Pawn, Square.A7, Square.A5),
-    Move(Piece.Pawn, Square.B7, Square.B6),
-    Move(Piece.Pawn, Square.B7, Square.B5),
-    Move(Piece.Pawn, Square.C7, Square.C6),
-    Move(Piece.Pawn, Square.C7, Square.C5),
-    Move(Piece.Pawn, Square.E7, Square.E6),
-    Move(Piece.Pawn, Square.F7, Square.F6),
-    Move(Piece.Pawn, Square.F7, Square.F5),
-    Move(Piece.Pawn, Square.G7, Square.G6),
-    Move(Piece.Pawn, Square.G7, Square.G5),
-    Move(Piece.Pawn, Square.H7, Square.H6),
-    Move(Piece.Pawn, Square.H7, Square.H5),
-
-    // Attacks
-    Move(Piece.Pawn, Square.C7, Square.D6),
-    Move(Piece.Pawn, Square.E7, Square.D6)
-  ]);
-
-  assert(actual == expected);
-}
-
-// Promotions
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/P7/8/8/8/8/8/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.White, Piece.Pawn));
-
-  auto expected = sort([
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Queen),
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Bishop),
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Knight),
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Rook)
-  ]);
-
-  assert(actual == expected);
-}
-
-
-unittest
-{
-  import std.algorithm;
-
-  auto board = Board();
-
-  auto actual = sort(board.moves!(Color.White, Piece.Pawn));
-
-  auto expected = sort([
-    Move(Piece.Pawn, Square.A2, Square.A3),
-    Move(Piece.Pawn, Square.A2, Square.A4),
-    Move(Piece.Pawn, Square.B2, Square.B3),
-    Move(Piece.Pawn, Square.B2, Square.B4),
-    Move(Piece.Pawn, Square.C2, Square.C3),
-    Move(Piece.Pawn, Square.C2, Square.C4),
-    Move(Piece.Pawn, Square.D2, Square.D3),
-    Move(Piece.Pawn, Square.D2, Square.D4),
-    Move(Piece.Pawn, Square.E2, Square.E3),
-    Move(Piece.Pawn, Square.E2, Square.E4),
-    Move(Piece.Pawn, Square.F2, Square.F3),
-    Move(Piece.Pawn, Square.F2, Square.F4),
-    Move(Piece.Pawn, Square.G2, Square.G3),
-    Move(Piece.Pawn, Square.G2, Square.G4),
-    Move(Piece.Pawn, Square.H2, Square.H3),
-    Move(Piece.Pawn, Square.H2, Square.H4)
-  ]);
-
-  assert(actual == expected);
-}
-
-// Knights
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/pppppppp/8/3N4/3N4/8/PPPPPPPP/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.White, Piece.Knight));
-
-  auto expected = sort([
-    // knight on d5
-    Move(Piece.Knight, Square.D5, Square.C7),
-    Move(Piece.Knight, Square.D5, Square.E7),
-    Move(Piece.Knight, Square.D5, Square.F6),
-    Move(Piece.Knight, Square.D5, Square.F4),
-    Move(Piece.Knight, Square.D5, Square.E3),
-    Move(Piece.Knight, Square.D5, Square.C3),
-    Move(Piece.Knight, Square.D5, Square.B4),
-    Move(Piece.Knight, Square.D5, Square.B6),
-
-    // Knight on d4
-    Move(Piece.Knight, Square.D4, Square.C6),
-    Move(Piece.Knight, Square.D4, Square.E6),
-    Move(Piece.Knight, Square.D4, Square.F5),
-    Move(Piece.Knight, Square.D4, Square.F3),
-    Move(Piece.Knight, Square.D4, Square.B3),
-    Move(Piece.Knight, Square.D4, Square.B5),
-  ]);
-}
-
-
-// King
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/8/2pP4/3K4/8/8/8/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.White, Piece.King));
-
-  auto expected = sort([
-    Move(Piece.King, Square.D5, Square.C6),
-    Move(Piece.King, Square.D5, Square.E6),
-    Move(Piece.King, Square.D5, Square.E5),
-    Move(Piece.King, Square.D5, Square.E4),
-    Move(Piece.King, Square.D5, Square.D4),
-    Move(Piece.King, Square.D5, Square.C4),
-    Move(Piece.King, Square.D5, Square.C5)
-  ]);
-}
-
-// Rook
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/3p4/8/3R4/3P4/8/8/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.White, Piece.Rook));
-
-  auto expected = sort([
-    Move(Piece.Rook, Square.D5, Square.A5),
-    Move(Piece.Rook, Square.D5, Square.B5),
-    Move(Piece.Rook, Square.D5, Square.C5),
-    Move(Piece.Rook, Square.D5, Square.D6),
-    Move(Piece.Rook, Square.D5, Square.D7),
-    Move(Piece.Rook, Square.D5, Square.E5),
-    Move(Piece.Rook, Square.D5, Square.F5),
-    Move(Piece.Rook, Square.D5, Square.G5),
-    Move(Piece.Rook, Square.D5, Square.H5),
-  ]);
-
-  assert(actual == expected);
-}
-
-// Bishop
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/5p2/8/3B4/2P5/8/8/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.White, Piece.Bishop));
-
-  auto expected = sort([
-    Move(Piece.Bishop, Square.D5, Square.A8),
-    Move(Piece.Bishop, Square.D5, Square.B7),
-    Move(Piece.Bishop, Square.D5, Square.C6),
-    Move(Piece.Bishop, Square.D5, Square.E6),
-    Move(Piece.Bishop, Square.D5, Square.F7),
-    Move(Piece.Bishop, Square.D5, Square.E4),
-    Move(Piece.Bishop, Square.D5, Square.F3),
-    Move(Piece.Bishop, Square.D5, Square.G2),
-    Move(Piece.Bishop, Square.D5, Square.H1),
-  ]);
-  assert(actual == expected);
-}
-
-
-
-// Queen
-unittest
-{
-  import std.algorithm;
-
-  auto fen = "8/5p2/8/3Q4/2P5/8/8/8 w KQkq - 0 1";
-  auto board = Board(fen);
-  auto actual = sort(board.moves!(Color.White, Piece.Queen));
-
-  auto expected = sort([
-    // Bishop-y
-    Move(Piece.Queen, Square.D5, Square.A8),
-    Move(Piece.Queen, Square.D5, Square.B7),
-    Move(Piece.Queen, Square.D5, Square.C6),
-    Move(Piece.Queen, Square.D5, Square.E6),
-    Move(Piece.Queen, Square.D5, Square.F7),
-    Move(Piece.Queen, Square.D5, Square.E4),
-    Move(Piece.Queen, Square.D5, Square.F3),
-    Move(Piece.Queen, Square.D5, Square.G2),
-    Move(Piece.Queen, Square.D5, Square.H1),
-    // Rook-y
-    Move(Piece.Queen, Square.D5, Square.A5),
-    Move(Piece.Queen, Square.D5, Square.B5),
-    Move(Piece.Queen, Square.D5, Square.C5),
-    Move(Piece.Queen, Square.D5, Square.E5),
-    Move(Piece.Queen, Square.D5, Square.F5),
-    Move(Piece.Queen, Square.D5, Square.G5),
-    Move(Piece.Queen, Square.D5, Square.H5),
-    Move(Piece.Queen, Square.D5, Square.D1),
-    Move(Piece.Queen, Square.D5, Square.D2),
-    Move(Piece.Queen, Square.D5, Square.D3),
-    Move(Piece.Queen, Square.D5, Square.D4),
-    Move(Piece.Queen, Square.D5, Square.D6),
-    Move(Piece.Queen, Square.D5, Square.D7),
-    Move(Piece.Queen, Square.D5, Square.D8),
-  ]);
-  assert(actual == expected);
-}
-
-// All
-unittest
-{
-  import std.algorithm;
-
-  auto board = Board();
-  auto actual = sort(board.moves!(Color.White));
-
-  auto expected = sort([
-    Move(Piece.Pawn, Square.A2, Square.A3),
-    Move(Piece.Pawn, Square.A2, Square.A4),
-    Move(Piece.Pawn, Square.B2, Square.B3),
-    Move(Piece.Pawn, Square.B2, Square.B4),
-    Move(Piece.Pawn, Square.C2, Square.C3),
-    Move(Piece.Pawn, Square.C2, Square.C4),
-    Move(Piece.Pawn, Square.D2, Square.D3),
-    Move(Piece.Pawn, Square.D2, Square.D4),
-    Move(Piece.Pawn, Square.E2, Square.E3),
-    Move(Piece.Pawn, Square.E2, Square.E4),
-    Move(Piece.Pawn, Square.F2, Square.F3),
-    Move(Piece.Pawn, Square.F2, Square.F4),
-    Move(Piece.Pawn, Square.G2, Square.G3),
-    Move(Piece.Pawn, Square.G2, Square.G4),
-    Move(Piece.Pawn, Square.H2, Square.H3),
-    Move(Piece.Pawn, Square.H2, Square.H4),
-    Move(Piece.Knight, Square.B1, Square.A3),
-    Move(Piece.Knight, Square.B1, Square.C3),
-    Move(Piece.Knight, Square.G1, Square.F3),
-    Move(Piece.Knight, Square.G1, Square.H3),
-  ]);
-
-  assert(actual == expected);
-}
-
-

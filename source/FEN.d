@@ -304,6 +304,19 @@ ColorPiece piece(char c)
   }
 }
 
+Color activePlayer(FEN fen)
+{
+  import std.string;
+
+  if (!fen.valid)
+  {
+    throw new Exception("Invalid FEN");
+  }
+
+  auto chunks = fen.split;
+  return (chunks[1] == "w") ? Color.White : Color.Black;
+}
+
 // Invalid chunk length
 unittest
 {
