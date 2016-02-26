@@ -7,3 +7,4 @@ __dummy.html
 dub.selections.json
 __test__library__
 __test__unittest__
+*.lst

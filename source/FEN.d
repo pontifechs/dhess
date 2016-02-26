@@ -191,7 +191,6 @@ bool valid(FEN fen)
   // en passant target square
   if (chunks[3].length > 2)
   {
-    std.stdio.writeln("here");
     return false;
   }
 
@@ -317,11 +316,95 @@ Color activePlayer(FEN fen)
   return (chunks[1] == "w") ? Color.White : Color.Black;
 }
 
-// Invalid chunk length
-unittest
+bool[Piece][Color] castling(FEN fen)
 {
-  FEN fen = "";
-  assert(!fen.valid);
+  import std.string;
+
+  if (!fen.valid)
+  {
+    throw new Exception("Invalid FEN");
+  }
+
+  auto chunks = fen.split;
+  auto castling = chunks[2];
+
+  bool[Piece][Color] ret;
+
+  ret[Color.White][Piece.King] = false;
+  ret[Color.White][Piece.Queen] = false;
+  ret[Color.Black][Piece.King] = false;
+  ret[Color.Black][Piece.Queen] = false;
+
+  foreach(c; castling)
+  {
+    switch(c)
+    {
+    case 'K':
+      ret[Color.White][Piece.King] = true;
+      break;
+    case 'k':
+      ret[Color.Black][Piece.King] = true;
+      break;
+    case 'Q':
+      ret[Color.White][Piece.Queen] = true;
+      break;
+    case 'q':
+      ret[Color.Black][Piece.Queen] = true;
+      break;
+    default:
+      // should never happen
+      assert(0);
+    }
+  }
+  return ret;
+}
+
+Nullable!Square enPassant(FEN fen)
+{
+  import std.string;
+  import std.algorithm;
+  import std.conv;
+
+  if (!fen.valid)
+  {
+    throw new Exception("Invalid FEN");
+  }
+
+  auto chunks = fen.split;
+
+  if (chunks[3].length == 1 && chunks[3] == "-")
+  {
+    return Nullable!Square();
+  }
+
+  auto squareString = chunks[3].map!toUpper.array;
+  return Nullable!Square(squareString.to!Square);
+}
+
+int drawClock(FEN fen)
+{
+  import std.string;
+  import std.conv;
+
+  if (!fen.valid)
+  {
+    throw new Exception("Invalid FEN");
+  }
+  auto chunks = fen.split;
+  return chunks[4].to!int;
+}
+
+int moveClock(FEN fen)
+{
+  import std.string;
+  import std.conv;
+
+  if (!fen.valid)
+  {
+    throw new Exception("Invalid FEN");
+  }
+  auto chunks = fen.split;
+  return chunks[5].to!int;
 }
 
 // Invalid board
@@ -337,13 +420,6 @@ unittest
   assert(!invalidChar.valid);
 }
 
-// Invalid active player
-unittest
-{
-  FEN invalidChar = "8/8/8/8/8/8/8/8 x KQkq - 0 1";
-  assert(!invalidChar.valid);
-}
-
 // Invalid Castling availability
 unittest
 {
@@ -352,161 +428,4 @@ unittest
 
   auto doubleAvailable = "KKkk";
   assert(!doubleAvailable.castlingChunk);
-}
-
-// valid positions
-unittest
-{
-  assert("a1".validPosition);
-  assert("b2".validPosition);
-  assert("c3".validPosition);
-  assert("d4".validPosition);
-  assert("h8".validPosition);
-  assert(!"i8".validPosition);
-  assert(!"h9".validPosition);
-}
-
-// valid en passant
-unittest
-{
-  FEN validEnPassant = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-  assert(validEnPassant.valid);
-
-  FEN invalidEnPassant1 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq x 0 1";
-  assert(!invalidEnPassant1.valid);
-
-  FEN invalidEnPassant2 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq x9 0 1";
-  assert(!invalidEnPassant2.valid);
-}
-
-// invalid move/half-move
-unittest
-{
-  FEN invalidHalfMove = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - n 1";
-  assert(!invalidHalfMove.valid);
-
-  FEN invalidMove = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 K";
-  assert(!invalidMove.valid);
-}
-
-// valid
-unittest
-{
-  assert(START.valid);
-}
-
-// parse board
-unittest
-{
-  FEN fen = START;
-
-  auto board = fen.parseBoard;
-
-  auto whiteBack = [Nullable!ColorPiece(ColorPiece(Color.White, Piece.Rook)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.Knight)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.Bishop)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.King)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.Queen)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.Bishop)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.Knight)),
-                    Nullable!ColorPiece(ColorPiece(Color.White, Piece.Rook))];
-  auto blackBack = [Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Rook)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Knight)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Bishop)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.King)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Queen)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Bishop)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Knight)),
-                    Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Rook))];
-
-  auto whitePawns = [Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn))];
-  auto blackPawns = [Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn)),
-                     Nullable!ColorPiece(ColorPiece(Color.Black, Piece.Pawn))];
-
-  auto empty = [Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece()];
-
-  check(board[0], whiteBack);
-  check(board[1], whitePawns);
-  check(board[2], empty);
-  check(board[3], empty);
-  check(board[4], empty);
-  check(board[5], empty);
-  check(board[6], blackPawns);
-  check(board[7], blackBack);
-}
-
-unittest
-{
-   FEN fen = "8/8/8/8/8/8/PPPPPPPP/RNBQ4 w KQkq - 0 1";
-
-  auto board = fen.parseBoard;
-
-  auto back = [Nullable!ColorPiece(),
-               Nullable!ColorPiece(),
-               Nullable!ColorPiece(),
-               Nullable!ColorPiece(),
-               Nullable!ColorPiece(ColorPiece(Color.White, Piece.Queen)),
-               Nullable!ColorPiece(ColorPiece(Color.White, Piece.Bishop)),
-               Nullable!ColorPiece(ColorPiece(Color.White, Piece.Knight)),
-               Nullable!ColorPiece(ColorPiece(Color.White, Piece.Rook))];
-  auto pawns = [Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn)),
-                Nullable!ColorPiece(ColorPiece(Color.White, Piece.Pawn))];
-  auto empty = [Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece(),
-                Nullable!ColorPiece()];
-
-
-  check(board[0], back);
-  check(board[1], pawns);
-  check(board[2], empty);
-  check(board[3], empty);
-  check(board[4], empty);
-  check(board[5], empty);
-  check(board[6], empty);
-  check(board[7], empty);
-}
-
-private void check(Nullable!ColorPiece[] left, Nullable!ColorPiece[] right)
-{
-  assert (left.length == right.length);
-  for (int i = 0; i < left.length; ++i)
-  {
-    if (left[i].isNull)
-    {
-      assert(right[i].isNull, "is null");
-      continue;
-    }
-    assert(left[i] == right[i], "equal");
-  }
 }

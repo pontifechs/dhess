@@ -63,6 +63,7 @@ unittest
 unittest
 {
   import std.algorithm;
+  import std.typecons;
 
   auto fen = "8/P7/8/8/8/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -281,3 +282,121 @@ unittest
 
   assert(actual == expected);
 }
+
+
+// En Passant
+unittest
+{
+  import std.algorithm;
+
+  auto fen = "8/8/8/3Pp3/8/8/8/8 w KQkq - 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Pawn));
+
+  auto expected = sort([
+    Move(Piece.Pawn, Square.D5, Square.D6)
+  ]);
+
+  assert(actual == expected);
+}
+
+
+// En Passant
+unittest
+{
+  import std.algorithm;
+
+  auto fen = "8/8/8/3PpP2/8/8/8/8 w KQkq e6 0 1";
+  auto board = Board(fen);
+  auto actual = sort(board.moves!(Color.White, Piece.Pawn));
+
+  auto expected = sort([
+    Move(Piece.Pawn, Square.D5, Square.D6),
+    Move(Piece.Pawn, Square.F5, Square.F6),
+    Move(Piece.Pawn, Square.D5, Square.E6),
+    Move(Piece.Pawn, Square.F5, Square.E6)
+  ]);
+
+  assert(actual == expected);
+}
+
+// Castling all available
+unittest
+{
+  import std.algorithm;
+  auto fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+  auto board = Board(fen);
+  std.stdio.writeln("thisone");
+  auto actualWhite = sort(board.moves!(Color.White, Piece.King));
+
+  auto expectedWhite = sort([
+    // Castling squares
+    Move(Piece.King, Square.E1, Square.G1),
+    Move(Piece.King, Square.E1, Square.C1),
+    // Normal Squares
+    Move(Piece.King, Square.E1, Square.D1),
+    Move(Piece.King, Square.E1, Square.D2),
+    Move(Piece.King, Square.E1, Square.E2),
+    Move(Piece.King, Square.E1, Square.F1),
+    Move(Piece.King, Square.E1, Square.F2),
+
+  ]);
+
+  assert(actualWhite == expectedWhite);
+
+  auto actualBlack = sort(board.moves!(Color.Black, Piece.King));
+
+  auto expectedBlack = sort([
+    // Castling squares
+    Move(Piece.King, Square.E8, Square.G8),
+    Move(Piece.King, Square.E8, Square.C8),
+    // Normal Squares
+    Move(Piece.King, Square.E8, Square.D8),
+    Move(Piece.King, Square.E8, Square.D7),
+    Move(Piece.King, Square.E8, Square.E7),
+    Move(Piece.King, Square.E8, Square.F8),
+    Move(Piece.King, Square.E8, Square.F7),
+  ]);
+
+  assert(actualWhite == expectedWhite);
+}
+
+// Castling queenSide in check, kingSide OK
+unittest
+{
+  import std.algorithm;
+  auto fen = "r3k2r/8/8/6b1/6B1/8/8/R3K2R w KQkq - 0 1";
+  auto board = Board(fen);
+  std.stdio.writeln("thisone");
+  auto actualWhite = sort(board.moves!(Color.White, Piece.King));
+
+  auto expectedWhite = sort([
+    // Castling squares
+    Move(Piece.King, Square.E1, Square.G1),
+    // Normal Squares
+    Move(Piece.King, Square.E1, Square.D1),
+    Move(Piece.King, Square.E1, Square.D2),
+    Move(Piece.King, Square.E1, Square.E2),
+    Move(Piece.King, Square.E1, Square.F1),
+    Move(Piece.King, Square.E1, Square.F2),
+
+  ]);
+
+  assert(actualWhite == expectedWhite);
+
+  auto actualBlack = sort(board.moves!(Color.Black, Piece.King));
+
+  auto expectedBlack = sort([
+    // Castling squares
+    Move(Piece.King, Square.E8, Square.G8),
+    // Normal Squares
+    Move(Piece.King, Square.E8, Square.D8),
+    Move(Piece.King, Square.E8, Square.D7),
+    Move(Piece.King, Square.E8, Square.E7),
+    Move(Piece.King, Square.E8, Square.F8),
+    Move(Piece.King, Square.E8, Square.F7),
+  ]);
+
+  assert(actualWhite == expectedWhite);
+}
+

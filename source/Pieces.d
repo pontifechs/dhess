@@ -19,11 +19,23 @@ enum Color: int
 
 Color not(Color c)()
 {
-  if (c == Color.Black)
+  static if (c == Color.Black)
   {
     return Color.White;
   }
   else if (c == Color.White)
+  {
+    return Color.Black;
+  }
+}
+
+Color not(Color c)
+{
+  if (c == Color.Black)
+  {
+    return Color.White;
+  }
+  else
   {
     return Color.Black;
   }

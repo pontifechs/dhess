@@ -5,7 +5,8 @@ import dhess.Position;
 
 import std.typecons;
 
-
+// TODO:: Lots of things should probably be in here rather than calculated elsewhere.
+// Things like if it's a castle, capture, Quiet, to optimize the inCheck away, etc.
 struct Move
 {
   Piece piece;
@@ -32,6 +33,22 @@ struct Move
     }
 
     return (this.promotion < rhs.promotion) ? 1 : -1;
+  }
+
+  bool isCastling() const
+  {
+    if (this.piece == Piece.King)
+    {
+      return false;
+    }
+    if (this.source != Square.E1 && this.source != Square.E8)
+    {
+      return false;
+    }
+    return (this.source == Square.E1 && this.destination == Square.G1) ||
+           (this.source == Square.E1 && this.destination == Square.C1) ||
+           (this.source == Square.E8 && this.destination == Square.G8) ||
+           (this.source == Square.E8 && this.destination == Square.C8);
   }
 }
 
