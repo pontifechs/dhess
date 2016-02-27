@@ -8,7 +8,8 @@ enum Piece
   Bishop = 2,
   Knight = 3,
   Rook = 4,
-  Pawn = 5
+  Pawn = 5,
+  None = 6
 }
 
 enum Color: int

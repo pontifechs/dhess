@@ -10,7 +10,18 @@
             "targetType" : "library",
             "targetPath" : "test",
             "sourcePaths": ["test/"],
-            "importPaths": ["test/"]
+            "importPaths": ["test/"],
+            "excludedSourceFiles": ["test/perft/app.d"]
+        }
+    ],
+    "subPackages" : [
+        {
+            "name" : "perft",
+            "targetType" : "executable",
+            "targetPath" : "test/perft/",
+            "sourcePaths" : ["test/perft/"],
+            "importPaths" : ["test/perft/"],
+            "dependencies": {"dhess":"*"}
         }
     ]
 }

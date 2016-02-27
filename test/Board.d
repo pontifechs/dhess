@@ -326,7 +326,6 @@ unittest
   import std.algorithm;
   auto fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
   auto board = Board(fen);
-  std.stdio.writeln("thisone");
   auto actualWhite = sort(board.moves!(Color.White, Piece.King));
 
   auto expectedWhite = sort([
@@ -367,7 +366,6 @@ unittest
   import std.algorithm;
   auto fen = "r3k2r/8/8/6b1/6B1/8/8/R3K2R w KQkq - 0 1";
   auto board = Board(fen);
-  std.stdio.writeln("thisone");
   auto actualWhite = sort(board.moves!(Color.White, Piece.King));
 
   auto expectedWhite = sort([
@@ -398,5 +396,30 @@ unittest
   ]);
 
   assert(actualWhite == expectedWhite);
+}
+
+// Serialize
+unittest
+{
+  import dhess.FEN;
+  auto start = Board();
+
+  assert(start.serialize == START);
+}
+
+// Simple move
+unittest
+{
+  import dhess.FEN;
+
+  auto start = Board();
+
+  start.move(Move(Piece.Pawn, Square.E2, Square.E4));
+  auto e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+  assert(start.serialize == e4);
+
+  start.move(Move(Piece.Pawn, Square.E7, Square.E5));
+  auto e6 = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2";
+  assert(start.serialize == e6);
 }
 

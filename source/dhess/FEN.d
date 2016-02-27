@@ -70,6 +70,11 @@ private bool castlingChunk(string castlingChunk)
     return false;
   }
 
+  if (castlingChunk == "-")
+  {
+    return true;
+  }
+
   bool seenK = false;
   bool seenk = false;
   bool seenQ = false;
@@ -159,6 +164,8 @@ bool valid(FEN fen)
 {
   import std.array;
   import std.string;
+
+  import std.stdio;
 
   auto chunks = fen.split;
   if (chunks.length != 6)
@@ -334,6 +341,11 @@ bool[Piece][Color] castling(FEN fen)
   ret[Color.White][Piece.Queen] = false;
   ret[Color.Black][Piece.King] = false;
   ret[Color.Black][Piece.Queen] = false;
+
+  if (castling == "-")
+  {
+    return ret;
+  }
 
   foreach(c; castling)
   {

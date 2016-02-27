@@ -5,13 +5,14 @@ import dhess.Position;
 
 import std.typecons;
 
-// TODO:: Lots of things should probably be in here rather than calculated elsewhere.
-// Things like if it's a castle, capture, Quiet, to optimize the inCheck away, etc.
 struct Move
 {
   Piece piece;
   Square source;
   Square destination;
+
+  Piece capture = Piece.None;
+  Square captureSquare;
 
   Piece promotion = Piece.Pawn;
 
@@ -32,6 +33,15 @@ struct Move
       return (this.destination > rhs.destination) ? 1 : -1;
     }
 
+    if (this.capture != rhs.capture)
+    {
+      return (this.capture > rhs.capture) ? 1 : -1;
+    }
+
+    if (this.captureSquare != rhs.captureSquare)
+    {
+      return (this.captureSquare > rhs.captureSquare) ? 1 : -1;
+    }
     return (this.promotion < rhs.promotion) ? 1 : -1;
   }
 
@@ -49,6 +59,11 @@ struct Move
            (this.source == Square.E1 && this.destination == Square.C1) ||
            (this.source == Square.E8 && this.destination == Square.G8) ||
            (this.source == Square.E8 && this.destination == Square.C8);
+  }
+
+  bool isQuiet() const
+  {
+    return capture == Piece.None;
   }
 }
 

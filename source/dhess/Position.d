@@ -1,7 +1,7 @@
 module dhess.Position;
 
 
-enum Row: ubyte 
+enum Row: ubyte
 {
   _1 = 0,
   _2 = 1,

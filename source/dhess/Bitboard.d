@@ -498,3 +498,14 @@ void printLong(Bitboard board)
   }
   writeln();
 }
+
+
+Bitboard bitboard(Row r)
+{
+  return 0xFFL << (r * 8);
+}
+
+unittest
+{
+  assert(Row._1.bitboard == RANK_1);
+}

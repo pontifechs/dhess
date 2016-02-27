@@ -275,6 +275,8 @@ private:
         return moves!(Color.White, Piece.Knight);
       case Piece.Pawn:
         return moves!(Color.White, Piece.Pawn);
+      case Piece.None:
+        assert(false, "Can't get moves for the None piece");
       }
     }
     else
@@ -293,6 +295,8 @@ private:
         return moves!(Color.Black, Piece.Knight);
       case Piece.Pawn:
         return moves!(Color.Black, Piece.Pawn);
+      case Piece.None:
+        assert(false, "Can't get moves for the None piece");
       }
     }
   }
@@ -713,6 +717,61 @@ public:
       moves!(c, Piece.Queen);
   }
 
+  Move[] moves() const
+  {
+    if (toMove == Color.White)
+    {
+      return moves!(Color.White);
+    }
+    else
+    {
+      return moves!(Color.Black);
+    }
+  }
+
+  bool legal(Move givenMove)
+  {
+    if (toMove == Color.White)
+    {
+      return legal!(Color.White)(givenMove);
+    }
+    else
+    {
+      return legal!(Color.Black)(givenMove);
+    }
+  }
+
+  bool legal(Color c)(Move givenMove) 
+  {
+     Bitboard source = (1L << givenMove.source);
+     Bitboard destination = (1L << givenMove.destination);
+
+     // Ensure the piece is where the source says it is.
+     if ((boards[c][givenMove.piece] & source) == 0L)
+     {
+       return false;
+     }
+
+     // Ensure the piece can move to the destination
+     Move[] possibles = moves(c, givenMove.piece);
+     if (!std.algorithm.canFind(possibles, givenMove))
+     {
+       return false;
+     }
+
+     // Conditionally make the move.
+     boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(source);
+     boards[c][givenMove.piece] = boards[c][givenMove.piece] | destination;
+
+     // Check if this leave the active player in check;
+     auto legal = !inCheck!c;
+
+     // Undo the move. 
+     boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(destination);
+     boards[c][givenMove.piece] = boards[c][givenMove.piece] | source;
+     return legal;
+  }
+
   void move(Move givenMove)
   {
     if (toMove == Color.White)
@@ -724,6 +783,7 @@ public:
       move!(Color.Black)(givenMove);
     }
   }
+
 
   private void move(Color c)(Move givenMove)
   {
@@ -746,6 +806,9 @@ public:
     // Conditionally make the move.
     boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(source);
     boards[c][givenMove.piece] = boards[c][givenMove.piece] | destination;
+
+    // If this is en passant, also remove the captured pawn.
+
 
     // Check if this leave the active player in check;
     if (inCheck!c)
@@ -775,7 +838,7 @@ public:
       }
       else
       {
-        this.enPassant = Nullable!Square((givenMove.source + 8).to!Square);
+        this.enPassant = Nullable!Square((givenMove.source - 8).to!Square);
       }
     }
 
@@ -859,6 +922,12 @@ public:
       }
     }
 
+    // If this is a pawn move, reset the draw clock.
+    if (givenMove.piece == Piece.Pawn)
+    {
+      this.drawClock = 0;
+    }
+
     // If this is a promotion, remove the mistakenly moved pawn, and replace it with the promotion.
     if (givenMove.promotion != Piece.Pawn)
     {
@@ -869,6 +938,133 @@ public:
 
     this.toMove = not!c;
   }
+
+  string serialize() const
+  {
+    auto board = "";
+    for (int i = 63; i >= 0; --i)
+    {
+      Square sq = i.to!Square;
+      board ~= serializeSquare(sq);
+    }
+    board = board[0..8].collapse ~ "/" ~
+            board[8..16].collapse ~ "/" ~
+            board[16..24].collapse ~ "/" ~
+            board[24..32].collapse ~ "/" ~
+            board[32..40].collapse ~ "/" ~
+            board[40..48].collapse ~ "/" ~
+            board[48..56].collapse ~ "/" ~
+            board[56..64].collapse;
+
+    auto activePlayer = (toMove == Color.White)? "w": "b";
+
+    auto castles = "";
+    if (castling[Color.White][Piece.King])
+    {
+      castles ~= "K";
+    }
+    if (castling[Color.White][Piece.Queen])
+    {
+      castles ~= "Q";
+    }
+    if (castling[Color.Black][Piece.King])
+    {
+      castles ~= "k";
+    }
+    if (castling[Color.Black][Piece.Queen])
+    {
+      castles ~= "q";
+    }
+    if (castles == "")
+    {
+      castles = "-";
+    }
+
+    import std.string;
+    auto enPassant = (enPassant.isNull) ? "-" : enPassant.get().to!string.toLower;
+    auto draw = drawClock.to!string;
+    auto move = moveClock.to!string;
+
+    return [board, activePlayer, castles, enPassant, draw, move].join(' ');
+  }
+
+  // Returns space for empty square
+  char serializeSquare(Square square) const
+  {
+    Bitboard sq = (1L << square);
+    if (boards[Color.White][Piece.King] & sq)
+    {
+      return 'K';
+    }
+    else if (boards[Color.Black][Piece.King] & sq)
+    {
+      return 'k';
+    }
+    else if (boards[Color.White][Piece.Queen] & sq)
+    {
+      return 'Q';
+    }
+    else if (boards[Color.Black][Piece.Queen] & sq)
+    {
+      return 'q';
+    }
+    else if (boards[Color.White][Piece.Rook] & sq)
+    {
+      return 'R';
+    }
+    else if (boards[Color.Black][Piece.Rook] & sq)
+    {
+      return 'r';
+    }
+    else if (boards[Color.White][Piece.Bishop] & sq)
+    {
+      return 'B';
+    }
+    else if (boards[Color.Black][Piece.Bishop] & sq)
+    {
+      return 'b';
+    }
+    else if (boards[Color.White][Piece.Knight] & sq)
+    {
+      return 'N';
+    }
+    else if (boards[Color.Black][Piece.Knight] & sq)
+    {
+      return 'n';
+    }
+    else if (boards[Color.White][Piece.Knight] & sq)
+    {
+      return 'N';
+    }
+    else if (boards[Color.Black][Piece.Knight] & sq)
+    {
+      return 'n';
+    }
+    else if (boards[Color.White][Piece.Pawn] & sq)
+    {
+      return 'P';
+    }
+    else if (boards[Color.Black][Piece.Pawn] & sq)
+    {
+      return 'p';
+    }
+    return ' ';
+  }
+}
+
+
+string collapse(string input) 
+{
+  import std.string;
+  return input
+    .replace("        ", "8")
+    .replace("       ", "7")
+    .replace("      ", "6")
+    .replace("     ", "5")
+    .replace("    ", "4")
+    .replace("   ", "3")
+    .replace("  ", "2")
+    .replace(" ", "1");
 }
 
 //  all black/all white
@@ -887,4 +1083,14 @@ unittest
   Board board = Board();
 
   assert(board.empty == (RANK_3 | RANK_4 | RANK_5 | RANK_6));
+}
+
+// Copy construct
+unittest
+{
+  Board a = Board();
+  Board b = a;
+  a.move(Move(Piece.Pawn, Square.E2, Square.E4));
+
+  assert( a != b);
 }
