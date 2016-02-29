@@ -14,7 +14,7 @@ struct Move
   Piece capture = Piece.None;
   Square captureSquare;
 
-  Piece promotion = Piece.Pawn;
+  Piece promotion = Piece.None;
 
   int opCmp(ref const Move rhs) const
   {
@@ -47,11 +47,11 @@ struct Move
 
   bool isCastling() const
   {
-    if (this.piece == Piece.King)
+    if (this.piece != Piece.King)
     {
       return false;
     }
-    if (this.source != Square.E1 && this.source != Square.E8)
+    if (!(this.source == Square.E1 || this.source == Square.E8))
     {
       return false;
     }
@@ -67,4 +67,16 @@ struct Move
   }
 }
 
+// isCastling
+unittest
+{
+  auto move = Move(Piece.King, Square.E1, Square.C1);
+  assert(move.isCastling);
+
+  auto notCastle = Move(Piece.Queen, Square.E1, Square.C1);
+  assert(!notCastle.isCastling);
+
+  auto almost = Move(Piece.King, Square.E1, Square.B1);
+  assert(!almost.isCastling);
+}
 

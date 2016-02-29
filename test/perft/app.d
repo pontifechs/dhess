@@ -3,49 +3,49 @@ module dhess.test.Perft;
 
 import dhess.Board;
 import dhess.FEN;
+import dhess.Position;
+import dhess.Pieces;
 
 import std.conv;
 import std.stdio;
+import std.algorithm;
+import std.array;
 
-
-int perft(Board board, ulong depth)
+ulong perft(Board board, ulong depth)
 {
   auto count = 0;
 
   // Base case
+  if (depth == 0)
+  {
+    return 1;
+  }
   if (depth == 1)
   {
-    auto moves = board.moves;
-    foreach (move; moves)
-    {
-      if (board.legal(move))
-      {
-        count++;
-      }
-    }
-    return count;
+    auto moves = board.moves.filter!(move => board.legal(move)).array;
+    return moves.length;
   }
   else
   {
-    auto moves = board.moves;
+    auto moves = board.moves.filter!(move => board.legal(move)).array;
     foreach (move; moves)
     {
-      if (board.legal(move))
-      {
-        // Copy the board
-        Board cp = board;
-        // Make the move
-        cp.move(move);
-        // Recurse
-        count += perft(cp, depth - 1);
-      }
+      // Copy the board
+      Board cp = board;
+
+      // Make the move
+      cp.move(move);
+
+      // Recurse
+      count += perft(cp, depth - 1);
+
     }
     return count;
   }
 }
 
 
-void runPerft(FEN start, int[] values)
+void runPerft(FEN start, long[] values)
 {
   auto board = Board(start);
 
@@ -66,12 +66,53 @@ void runPerft(FEN start, int[] values)
 
 void main()
 {
-  // traditional:
-  // runPerft(START, [20, 400, 8_902]);
+  import std.datetime;
 
-  // position 3:
+  /*
+  // traditional:
+  writeln(Clock.currTime());
+  runPerft(START, [20, 400, 8_902, 197_281, 4_865_609, 119_060_324, 3_195_901_860, 84_998_978_956]);
+  writeln("Traditional Complete!");
+
+  writeln(Clock.currTime());
+  pos2();
+  writeln("Pos2 Complete!");
+
+  writeln(Clock.currTime());
+  pos3();
+  writeln("Pos3 Complete!");
+
+  writeln(Clock.currTime());
+  pos4();
+  writeln("Pos4 Complete!");
+
+  writeln(Clock.currTime());
+  pos5();
+  writeln("Pos5 Complete!");
+
+  writeln(Clock.currTime());
+  pos6();
+  writeln("Pos6 Complete!");
+  */
+  auto board = Board();
+  stockfish(board, 7);
+}
+
+// Kiwipete
+void pos2()
+{
+  import dhess.Move;
+  import dhess.Pieces;
+  import dhess.Position;
+
+  auto pos2FEN = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+  runPerft(pos2FEN, [48, 2_039, 97_862, 4_085_603, 193_690_690]);
+}
+
+void pos3()
+{
   auto pos3FEN = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
-  //runPerft(pos3FEN, [14, 191, 2812, 43_238]);
+  runPerft(pos3FEN, [14, 191, 2812, 43_238, 674_624, 11_030_083, 178_633_661]);
 
   auto rookCheck = "8/2p5/3p4/KP5r/5R1k/8/4P1P1/8 b - - 0 1";
   runPerft(rookCheck, [2]);
@@ -125,10 +166,50 @@ void main()
   runPerft(rookWest, [15]);
   auto pawnEPush = "8/2p5/3p4/KP5r/1R3p1k/4P3/6P1/8 b - - 0 1";
   runPerft(pawnEPush, [15]);
-
-
-
-
-
 }
 
+void pos4()
+{
+  auto fen = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
+  runPerft(fen, [6, 264, 9_467, 422_333, 15_833_292, 706_045_033]);
+}
+
+void pos5()
+{
+  auto fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+  runPerft(fen, [44, 1_486, 62_379, 2_103_487, 89_941_194]);
+}
+
+void pos6()
+{
+  auto fen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+  runPerft(fen, [46,
+                 2_079,
+                 89_890,
+                 3_894_594,
+                 164_075_551,
+                 6_923_051_137,
+                 287_188_994_746,
+                 11_923_589_843_527,
+                 490_154_852_788_714
+             ]);
+}
+
+// Useful for comparing results to stockfish's perft
+void stockfish(Board board, int depth = 1)
+{
+  import std.algorithm;
+  import std.array;
+
+  auto moves = board.moves.filter!(move => board.legal(move)).array;
+  writeln(moves.length);
+  foreach(move; moves)
+  {
+    write(move.source);
+    write(move.destination);
+    Board cp = board;
+    cp.move(move);
+    write(": ");
+    writeln(perft(cp, depth - 1));
+  }
+}

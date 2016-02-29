@@ -9,12 +9,114 @@ import dhess.Move;
 import std.conv;
 import std.typecons;
 
+struct Castling
+{
+  bool whiteKingSide = false;
+  bool whiteQueenSide = false;
+  bool blackKingSide = false;
+  bool blackQueenSide = false;
+
+  bool opIndex(Color c, Piece p) const
+  {
+    if (c == Color.White)
+    {
+      if (p == Piece.King)
+      {
+        return whiteKingSide;
+      }
+      else if (p == Piece.Queen)
+      {
+        return whiteQueenSide;
+      }
+      else
+      {
+        assert(false, "No castling info for piece: " ~ p.to!string);
+      }
+    }
+    else
+    {
+      if (p == Piece.King)
+      {
+        return blackKingSide;
+      }
+      else if (p == Piece.Queen)
+      {
+        return blackQueenSide;
+      }
+      else
+      {
+        assert(false, "No castling info for piece: " ~ p.to!string);
+      }
+    }
+  }
+
+  void opIndexAssign(bool val, Color c, Piece p)
+  {
+     if (c == Color.White)
+    {
+      if (p == Piece.King)
+      {
+        whiteKingSide = val;
+      }
+      else if (p == Piece.Queen)
+      {
+        whiteQueenSide = val;
+      }
+      else
+      {
+        assert(false, "No castling info for piece: " ~ p.to!string);
+      }
+    }
+    else
+    {
+      if (p == Piece.King)
+      {
+        blackKingSide = val;
+      }
+      else if (p == Piece.Queen)
+      {
+        blackQueenSide = val;
+      }
+      else
+      {
+        assert(false, "No castling info for piece: " ~ p.to!string);
+      }
+    }
+  }
+
+  string serialize() const
+  {
+    string ret = "";
+    if (whiteKingSide)
+    {
+      ret ~= "K";
+    }
+    if (whiteQueenSide)
+    {
+      ret ~= "Q";
+    }
+    if (blackKingSide)
+    {
+      ret ~= "k";
+    }
+    if (blackQueenSide)
+    {
+      ret ~= "q";
+    }
+    if (ret == "")
+    {
+      ret = "-";
+    }
+    return ret;
+  }
+}
+
 struct Board
 {
   Bitboard[6][2] boards;
 
   Color toMove = Color.White;
-  bool[Piece][Color] castling;
+  Castling castling;
   Nullable!Square enPassant = Nullable!Square();
   int drawClock;
   int moveClock;
@@ -40,7 +142,15 @@ struct Board
     }
 
     b.toMove = fen.activePlayer;
-    b.castling = fen.castling;
+    auto castling = fen.castling;
+
+    b.castling[Color.White, Piece.King] = castling[Color.White][Piece.King];
+    b.castling[Color.White, Piece.Queen] = castling[Color.White][Piece.Queen];
+    b.castling[Color.Black, Piece.King] = castling[Color.Black][Piece.King];
+    b.castling[Color.Black, Piece.Queen] = castling[Color.Black][Piece.Queen];
+
+
+
     b.enPassant = fen.enPassant;
     b.drawClock = fen.drawClock;
     b.moveClock = fen.moveClock;
@@ -301,12 +411,78 @@ private:
     }
   }
 
+  Piece on(Square sq) const
+  {
+    Bitboard square = (1L << sq);
+    if ((boards[Color.White][Piece.King] | boards[Color.Black][Piece.King]) & square)
+    {
+      return Piece.King;
+    }
+    else if ((boards[Color.White][Piece.Queen] | boards[Color.Black][Piece.Queen]) & square)
+    {
+      return Piece.Queen;
+    }
+    else if ((boards[Color.White][Piece.Rook] | boards[Color.Black][Piece.Rook]) & square)
+    {
+      return Piece.Rook;
+    }
+    else if ((boards[Color.White][Piece.Bishop] | boards[Color.Black][Piece.Bishop]) & square)
+    {
+      return Piece.Bishop;
+    }
+    else if ((boards[Color.White][Piece.Knight] | boards[Color.Black][Piece.Knight]) & square)
+    {
+      return Piece.Knight;
+    }
+    else if ((boards[Color.White][Piece.Pawn] | boards[Color.Black][Piece.Pawn]) & square)
+    {
+      return Piece.Pawn;
+    }
+    return Piece.None;
+  }
+
 public:
 
   // Pawns -------------------------------------------------------------------------------------------
   Move[] moves(Color color, Piece piece)() const
     if (piece == Piece.Pawn)
   {
+    Move[] buildMove(Color color)(Square source,
+                                 Square dest,
+                                 Piece capturePiece = Piece.None,
+                                 Square captureSquare = Square.init)
+    {
+      // If it's on the enemy home rank, fill in promotions.
+      auto destBoard = (1L << dest);
+      static if (color == Color.White)
+      {
+        if ((destBoard & RANK_8) > 0)
+        {
+          return [
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Queen),
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Rook),
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Bishop),
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Knight)
+            ];
+        }
+      }
+      else
+      {
+        if ((destBoard & RANK_1) > 0)
+        {
+          return [
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Queen),
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Rook),
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Bishop),
+            Move(Piece.Pawn, source, dest, capturePiece, captureSquare, Piece.Knight)
+            ];
+        }
+      }
+
+      // Otherwise no promotions are necessary
+      return [Move(Piece.Pawn, source, dest, capturePiece, captureSquare)];
+    }
+
     enum pushDirection = (color == Color.White) ? 8 : -8;
     enum westAttackDirection = (color == Color.White) ? 9 : -7;
     enum eastAttackDirection = (color == Color.White) ? 7 : -9;
@@ -316,11 +492,11 @@ public:
     // Single pushes
     static if (color == Color.White)
     {
-      auto singles = (boards[color][piece].north & empty).remove(RANK_8);
+      auto singles = (boards[color][piece].north & empty);
     }
     else
     {
-      auto singles = (boards[color][piece].south & empty).remove(RANK_1);
+      auto singles = (boards[color][piece].south & empty);
     }
 
     // Double pushes
@@ -337,14 +513,14 @@ public:
     while (singles > 0)
     {
       auto sq = singles.LS1B;
-      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq);
+      ret ~= buildMove!(color)((sq - pushDirection).to!Square, sq);
       singles = singles.resetLS1B;
     }
 
     while (doubles > 0)
     {
       auto sq = doubles.LS1B;
-      ret ~= Move(Piece.Pawn, (sq - 2*pushDirection).to!Square, sq);
+      ret ~= buildMove!(color)((sq - 2*pushDirection).to!Square, sq);
       doubles = doubles.resetLS1B;
     }
 
@@ -366,7 +542,8 @@ public:
     {
 
       auto sq = westAttacks.LS1B;
-      ret ~= Move(Piece.Pawn, (sq - westAttackDirection).to!Square, sq);
+      auto source = (sq - westAttackDirection).to!Square;
+      ret ~= buildMove!(color)(source, sq, on(sq), sq);
       westAttacks = westAttacks.resetLS1B;
     }
 
@@ -374,29 +551,9 @@ public:
     while (eastAttacks > 0)
     {
       auto sq = eastAttacks.LS1B;
-      ret ~= Move(Piece.Pawn, (sq - eastAttackDirection).to!Square, sq);
+      auto source = (sq - eastAttackDirection).to!Square;
+      ret ~= buildMove!(color)(source, sq, on(sq), sq);
       eastAttacks = eastAttacks.resetLS1B;
-    }
-
-
-    // Pawn promotions
-    static if (color == Color.White)
-    {
-      auto promotions = (boards[color][piece].north & empty & RANK_8);
-    }
-    else
-    {
-      auto promotions = (boards[color][piece].south & empty & RANK_1);
-    }
-
-    while (promotions > 0)
-    {
-      auto sq = promotions.LS1B;
-      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Queen);
-      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Bishop);
-      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Knight);
-      ret ~= Move(Piece.Pawn, (sq - pushDirection).to!Square, sq, Piece.Rook);
-      promotions = promotions.resetLS1B;
     }
 
     // En Passant
@@ -417,14 +574,16 @@ public:
       while (westEnPassant > 0)
       {
         auto sq = westEnPassant.LS1B;
-        ret ~= Move(Piece.Pawn, (sq - westAttackDirection).to!Square, sq);
+        auto source = (sq - westAttackDirection).to!Square;
+        ret ~= buildMove!(color)(source, sq, Piece.Pawn, (sq - pushDirection).to!Square);
         westEnPassant = westEnPassant.resetLS1B;
       }
 
       while (eastEnPassant > 0)
       {
         auto sq = eastEnPassant.LS1B;
-        ret ~= Move(Piece.Pawn, (sq - eastAttackDirection).to!Square, sq);
+        auto source = (sq - eastAttackDirection).to!Square;
+        ret ~= buildMove!(color)(source, sq, Piece.Pawn, (sq- pushDirection).to!Square);
         eastEnPassant = eastEnPassant.resetLS1B;
       }
     }
@@ -455,7 +614,9 @@ public:
       while (knightMoves > 0)
       {
         auto dest = knightMoves.LS1B;
-        ret ~= Move(Piece.Knight, source, dest);
+        auto piece = on(dest);
+        auto captureSquare = (piece == Piece.None) ? Square.init: dest;
+        ret ~= Move(Piece.Knight, source, dest, piece, captureSquare);
         knightMoves = knightMoves.resetLS1B;
       }
 
@@ -485,8 +646,10 @@ public:
 
     while (possible > 0)
     {
-      auto sq = possible.LS1B;
-      ret ~= Move(Piece.King, source, sq);
+      auto dest = possible.LS1B;
+      auto piece = on(dest);
+      auto captureSquare = (piece == Piece.None) ? Square.init: dest;
+      ret ~= Move(Piece.King, source, dest, piece, captureSquare);
       possible = possible.resetLS1B;
     }
 
@@ -505,39 +668,47 @@ public:
     static if (c == Color.White)
     {
       auto kingSideSquares = F_1 | G_1;
-      auto queenSideSquares = B_1 | C_1 | D_1;
+      auto queenSideNoCheck = C_1 | D_1;
+      auto queenSideEmpty = B_1 | C_1 | D_1;
       auto kingSquare = Square.E1;
       auto kingSideSquare = Square.G1;
+      auto kingSideRook = H_1;
       auto queenSideSquare = Square.C1;
+      auto queenSideRook = A_1;
     }
     else
     {
       auto kingSideSquares = F_8 | G_8;
-      auto queenSideSquares = B_8 | C_8 | D_8;
+      auto queenSideNoCheck = C_8 | D_8;
+      auto queenSideEmpty = B_8 | C_8 | D_8;
       auto kingSquare = Square.E8;
       auto kingSideSquare = Square.G8;
+      auto kingSideRook = H_8;
       auto queenSideSquare = Square.C8;
+      auto queenSideRook = A_8;
     }
 
     Move[] ret = [];
-    if (castling[c][Piece.King])
+    if (castling[c, Piece.King])
     {
       // There is space to castle:
       bool squaresEmpty = (all & kingSideSquares) == 0;
       // Not castling through check
       bool squaresInCheck = (attackedSquares!(not!c) & kingSideSquares) > 0;
-      if (squaresEmpty && !squaresInCheck)
+      bool rookIsThere = (boards[c][Piece.Rook] & kingSideRook) > 0;
+      if (squaresEmpty && !squaresInCheck && rookIsThere)
       {
         ret ~= Move(Piece.King, kingSquare, kingSideSquare);
       }
     }
-    if (castling[c][Piece.Queen])
+    if (castling[c, Piece.Queen])
     {
        // There is space to castle:
-      bool squaresEmpty = (all & queenSideSquares) == 0;
+      bool squaresEmpty = (all & queenSideEmpty) == 0;
       // Not castling through check
-      bool squaresInCheck = (attackedSquares!(not!c) & queenSideSquares) > 0;
-      if (squaresEmpty && !squaresInCheck)
+      bool squaresInCheck = (attackedSquares!(not!c) & queenSideNoCheck) > 0;
+      bool rookIsThere = (boards[c][Piece.Rook] & queenSideRook) > 0;
+      if (squaresEmpty && !squaresInCheck && rookIsThere)
       {
         ret ~= Move(Piece.King, kingSquare, queenSideSquare);
       }
@@ -609,12 +780,18 @@ public:
                       marchCollisions(rook, &south) |
                       marchCollisions(rook, &west)) & enemy!c;
 
-      auto all = moves | attacks;
-      while (all > 0)
+      while (moves > 0)
       {
-        auto dest = all.LS1B;
+        auto dest = moves.LS1B;
         ret ~= Move(Piece.Rook, sq, dest);
-        all = all.resetLS1B;
+        moves = moves.resetLS1B;
+      }
+
+      while (attacks > 0)
+      {
+        auto dest = attacks.LS1B;
+        ret ~= Move(Piece.Rook, sq, dest, on(dest), dest);
+        attacks = attacks.resetLS1B;
       }
 
       rooks = rooks.resetLS1B;
@@ -645,13 +822,19 @@ public:
                       marchCollisions(bishop, &southeast) |
                       marchCollisions(bishop, &southwest) |
                       marchCollisions(bishop, &northwest)) & enemy!c;
-      auto all = moves | attacks;
 
-      while (all > 0)
+      while (moves > 0)
       {
-        auto dest = all.LS1B;
+        auto dest = moves.LS1B;
         ret ~= Move(Piece.Bishop, source, dest);
-        all = all.resetLS1B;
+        moves = moves.resetLS1B;
+      }
+
+      while (attacks > 0)
+      {
+        auto dest = attacks.LS1B;
+        ret ~= Move(Piece.Bishop, source, dest, on(dest), dest);
+        attacks = attacks.resetLS1B;
       }
 
       bishops = bishops.resetLS1B;
@@ -691,13 +874,18 @@ public:
                          marchCollisions(queen, &west) |
                          marchCollisions(queen, &northwest)) & enemy!c;
 
-      auto all = moves | collisions;
-
-      while (all > 0)
+      while (moves > 0)
       {
-        auto dest = all.LS1B;
+        auto dest = moves.LS1B;
         ret ~= Move(Piece.Queen, source, dest);
-        all = all.resetLS1B;
+        moves = moves.resetLS1B;
+      }
+
+      while (collisions > 0)
+      {
+        auto dest = collisions.LS1B;
+        ret ~= Move(Piece.Queen, source, dest, on(dest), dest);
+        collisions = collisions.resetLS1B;
       }
 
       queens = queens.resetLS1B;
@@ -741,34 +929,47 @@ public:
     }
   }
 
-  bool legal(Color c)(Move givenMove) 
+  bool legal(Color c)(Move givenMove)
   {
      Bitboard source = (1L << givenMove.source);
      Bitboard destination = (1L << givenMove.destination);
 
-     // Ensure the piece is where the source says it is.
-     if ((boards[c][givenMove.piece] & source) == 0L)
+     version(unittest)
      {
-       return false;
+       // Ensure the piece is where the source says it is.
+       if ((boards[c][givenMove.piece] & source) == 0L)
+       {
+         return false;
+       }
+
+       // Ensure the piece can move to the destination
+       Move[] possibles = moves(c, givenMove.piece);
+       if (!std.algorithm.canFind(possibles, givenMove))
+       {
+         return false;
+       }
      }
 
-     // Ensure the piece can move to the destination
-     Move[] possibles = moves(c, givenMove.piece);
-     if (!std.algorithm.canFind(possibles, givenMove))
+     // Assert this is outwardly const;
+     version(unittest)
      {
-       return false;
+       Board cp = this;
      }
 
      // Conditionally make the move.
-     boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(source);
-     boards[c][givenMove.piece] = boards[c][givenMove.piece] | destination;
+     makeMove!c(givenMove);
 
      // Check if this leave the active player in check;
      auto legal = !inCheck!c;
+     // Undo the move.
+     unmakeMove!c(givenMove);
 
-     // Undo the move. 
-     boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(destination);
-     boards[c][givenMove.piece] = boards[c][givenMove.piece] | source;
+     version(unittest)
+     {
+       import std.conv;
+       assert(this.boards == cp.boards, "Make/Unmake not const for move: " ~ givenMove.to!string);
+     }
+
      return legal;
   }
 
@@ -784,43 +985,57 @@ public:
     }
   }
 
-
-  private void move(Color c)(Move givenMove)
+  // CAN MAKE ILLEGAL MOVES!!!
+  private void makeMove(Color c)(Move givenMove)
   {
     Bitboard source = (1L << givenMove.source);
     Bitboard destination = (1L << givenMove.destination);
+    Bitboard capture = (1L << givenMove.captureSquare);
 
-    // Ensure the piece is where the source says it is.
-    if ((boards[c][givenMove.piece] & source) == 0L)
+    // Make the move
+    boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(source);
+    boards[c][givenMove.piece] = boards[c][givenMove.piece] | destination;
+
+    // Remove the captured piece
+    if(givenMove.capture != Piece.None)
     {
-      throw new Exception("Invalid move. No piece on: " ~ givenMove.source);
+      version(unittest)
+      {
+        assert((boards[not!c][givenMove.capture] & capture) > 0, "Attempted to capture a non-existent piece");
+      }
+      boards[not!c][givenMove.capture] = boards[not!c][givenMove.capture].remove(capture);
     }
+  }
 
-    // Ensure the piece can move to the destination
-    Move[] possibles = moves(c, givenMove.piece);
-    if (!std.algorithm.canFind(possibles, givenMove))
+  private void unmakeMove(Color c)(Move givenMove)
+  {
+    Bitboard source = (1L << givenMove.source);
+    Bitboard destination = (1L << givenMove.destination);
+    Bitboard capture = (1L << givenMove.captureSquare);
+
+    // UnMake the move
+    boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(destination);
+    boards[c][givenMove.piece] = boards[c][givenMove.piece] | source;
+
+    // Remove the captured piece
+    if(givenMove.capture != Piece.None)
+    {
+      boards[not!c][givenMove.capture] = boards[not!c][givenMove.capture] | capture;
+    }
+  }
+
+  private void move(Color c)(Move givenMove)
+  {
+    if (!legal(givenMove))
     {
       throw new Exception("Illegal move!");
     }
 
-    // Conditionally make the move.
-    boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(source);
-    boards[c][givenMove.piece] = boards[c][givenMove.piece] | destination;
-
-    // If this is en passant, also remove the captured pawn.
-
-
-    // Check if this leave the active player in check;
-    if (inCheck!c)
-    {
-      // Undo the move
-      boards[c][givenMove.piece] = boards[c][givenMove.piece].remove(destination);
-      boards[c][givenMove.piece] = boards[c][givenMove.piece] | source;
-
-      throw new Exception("Move leaves king in check!");
-    }
+    Bitboard source = (1L << givenMove.source);
+    Bitboard destination = (1L << givenMove.destination);
 
     // Move is legal, so go ahead and make it
+    makeMove!c(givenMove);
     static if (c == Color.Black)
     {
       this.moveClock++;
@@ -845,8 +1060,8 @@ public:
     // Update castling eligibility
     if (givenMove.piece == Piece.King)
     {
-      castling[c][Piece.King] = false;
-      castling[c][Piece.Queen] = false;
+      castling[c, Piece.King] = false;
+      castling[c, Piece.Queen] = false;
     }
     if (givenMove.piece == Piece.Rook)
     {
@@ -854,22 +1069,51 @@ public:
       {
         if (givenMove.source == Square.H1)
         {
-          castling[c][Piece.King] = false;
+          castling[c, Piece.King] = false;
         }
         else if (givenMove.source == Square.A1)
         {
-          castling[c][Piece.King] = false;
+          castling[c, Piece.Queen] = false;
         }
       }
       else
       {
         if (givenMove.source == Square.H8)
         {
-          castling[toMove][Piece.King] = false;
+          castling[c, Piece.King] = false;
         }
         else if (givenMove.source == Square.A8)
         {
-          castling[toMove][Piece.King] = false;
+          castling[c, Piece.Queen] = false;
+        }
+      }
+    }
+    // If a rook has been captured, the enemy can't castle with it anymore
+    static if (c == Color.White)
+    {
+      if (givenMove.capture == Piece.Rook)
+      {
+        if (givenMove.captureSquare == Square.H8)
+        {
+          castling[not!c, Piece.King] = false;
+        }
+        else if (givenMove.captureSquare == Square.A8)
+        {
+          castling[not!c, Piece.Queen] = false;
+        }
+      }
+    }
+    else
+    {
+      if (givenMove.capture == Piece.Rook)
+      {
+        if (givenMove.captureSquare == Square.H1)
+        {
+          castling[not!c, Piece.King] = false;
+        }
+        else if (givenMove.captureSquare == Square.A1)
+        {
+          castling[not!c, Piece.Queen] = false;
         }
       }
     }
@@ -902,8 +1146,8 @@ public:
       default:
         throw new Exception("Invalid isCastling: Returned true for destination: " ~ givenMove.destination);
       }
-      castling[c][Piece.King] = false;
-      castling[c][Piece.Queen] = false;
+      castling[c, Piece.King] = false;
+      castling[c, Piece.Queen] = false;
     }
 
     // If this is a capture, remove the captured piece.
@@ -929,7 +1173,7 @@ public:
     }
 
     // If this is a promotion, remove the mistakenly moved pawn, and replace it with the promotion.
-    if (givenMove.promotion != Piece.Pawn)
+    if (givenMove.promotion != Piece.None)
     {
       assert(givenMove.piece == Piece.Pawn);
       boards[c][Piece.Pawn] = boards[c][Piece.Pawn].remove(destination);
@@ -958,27 +1202,7 @@ public:
 
     auto activePlayer = (toMove == Color.White)? "w": "b";
 
-    auto castles = "";
-    if (castling[Color.White][Piece.King])
-    {
-      castles ~= "K";
-    }
-    if (castling[Color.White][Piece.Queen])
-    {
-      castles ~= "Q";
-    }
-    if (castling[Color.Black][Piece.King])
-    {
-      castles ~= "k";
-    }
-    if (castling[Color.Black][Piece.Queen])
-    {
-      castles ~= "q";
-    }
-    if (castles == "")
-    {
-      castles = "-";
-    }
+    auto castles = castling.serialize;
 
     import std.string;
     auto enPassant = (enPassant.isNull) ? "-" : enPassant.get().to!string.toLower;
@@ -1094,3 +1318,30 @@ unittest
 
   assert( a != b);
 }
+
+// makeMove
+unittest
+{
+  auto fen = "8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1";
+  auto board = Board(fen);
+  auto illegal = Move(Piece.Rook, Square.H5, Square.G5);
+  assert(!board.legal(illegal));
+  board.makeMove!(Color.Black)(illegal);
+  assert(board.inCheck!(Color.Black));
+  auto expected = "8/2p5/3p4/KP4r1/1R3p1k/6P1/4P3/8 b - - 0 1";
+  assert(board.serialize == expected);
+}
+
+// makeMove // unmakeMove are effectively const
+unittest
+{
+
+  auto fen = "8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1";
+  auto board = Board(fen);
+  auto move = Move(Piece.Pawn, Square.F4, Square.G3, Piece.Pawn, Square.G3);
+  board.makeMove!(Color.Black)(move);
+  board.unmakeMove!(Color.Black)(move);
+  auto fresh = Board(fen);
+  assert(board.boards == fresh.boards);
+}
+

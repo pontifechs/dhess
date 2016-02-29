@@ -4,6 +4,9 @@ import dhess.Pieces;
 import dhess.Move;
 import dhess.Position;
 
+import std.stdio;
+import std.algorithm;
+import std.array;
 
 // Build from FEN
 unittest
@@ -29,7 +32,6 @@ unittest
 // Pawn moves
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/pppppppp/3P4/4P3/8/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -52,8 +54,8 @@ unittest
     Move(Piece.Pawn, Square.H7, Square.H5),
 
     // Attacks
-    Move(Piece.Pawn, Square.C7, Square.D6),
-    Move(Piece.Pawn, Square.E7, Square.D6)
+    Move(Piece.Pawn, Square.C7, Square.D6, Piece.Pawn, Square.D6),
+    Move(Piece.Pawn, Square.E7, Square.D6, Piece.Pawn, Square.D6)
   ]);
 
   assert(actual == expected);
@@ -62,7 +64,6 @@ unittest
 // Promotions
 unittest
 {
-  import std.algorithm;
   import std.typecons;
 
   auto fen = "8/P7/8/8/8/8/8/8 w KQkq - 0 1";
@@ -70,19 +71,17 @@ unittest
   auto actual = sort(board.moves!(Color.White, Piece.Pawn));
 
   auto expected = sort([
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Queen),
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Bishop),
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Knight),
-    Move(Piece.Pawn, Square.A7, Square.A8, Piece.Rook)
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.None, Square.init, Piece.Queen),
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.None, Square.init, Piece.Bishop),
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.None, Square.init, Piece.Knight),
+    Move(Piece.Pawn, Square.A7, Square.A8, Piece.None, Square.init, Piece.Rook)
   ]);
-
   assert(actual == expected);
 }
 
 
 unittest
 {
-  import std.algorithm;
 
   auto board = Board();
 
@@ -113,7 +112,6 @@ unittest
 // Knights
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/pppppppp/8/3N4/3N4/8/PPPPPPPP/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -121,8 +119,8 @@ unittest
 
   auto expected = sort([
     // knight on d5
-    Move(Piece.Knight, Square.D5, Square.C7),
-    Move(Piece.Knight, Square.D5, Square.E7),
+    Move(Piece.Knight, Square.D5, Square.C7, Piece.Pawn, Square.C7),
+    Move(Piece.Knight, Square.D5, Square.E7, Piece.Pawn, Square.E7),
     Move(Piece.Knight, Square.D5, Square.F6),
     Move(Piece.Knight, Square.D5, Square.F4),
     Move(Piece.Knight, Square.D5, Square.E3),
@@ -144,7 +142,6 @@ unittest
 // King
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/8/2pP4/3K4/8/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -164,7 +161,6 @@ unittest
 // Rook
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/3p4/8/3R4/3P4/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -175,7 +171,7 @@ unittest
     Move(Piece.Rook, Square.D5, Square.B5),
     Move(Piece.Rook, Square.D5, Square.C5),
     Move(Piece.Rook, Square.D5, Square.D6),
-    Move(Piece.Rook, Square.D5, Square.D7),
+    Move(Piece.Rook, Square.D5, Square.D7, Piece.Pawn, Square.D7),
     Move(Piece.Rook, Square.D5, Square.E5),
     Move(Piece.Rook, Square.D5, Square.F5),
     Move(Piece.Rook, Square.D5, Square.G5),
@@ -188,7 +184,6 @@ unittest
 // Bishop
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/5p2/8/3B4/2P5/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -199,12 +194,13 @@ unittest
     Move(Piece.Bishop, Square.D5, Square.B7),
     Move(Piece.Bishop, Square.D5, Square.C6),
     Move(Piece.Bishop, Square.D5, Square.E6),
-    Move(Piece.Bishop, Square.D5, Square.F7),
+    Move(Piece.Bishop, Square.D5, Square.F7, Piece.Pawn, Square.F7),
     Move(Piece.Bishop, Square.D5, Square.E4),
     Move(Piece.Bishop, Square.D5, Square.F3),
     Move(Piece.Bishop, Square.D5, Square.G2),
     Move(Piece.Bishop, Square.D5, Square.H1),
   ]);
+
   assert(actual == expected);
 }
 
@@ -213,7 +209,6 @@ unittest
 // Queen
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/5p2/8/3Q4/2P5/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -225,7 +220,7 @@ unittest
     Move(Piece.Queen, Square.D5, Square.B7),
     Move(Piece.Queen, Square.D5, Square.C6),
     Move(Piece.Queen, Square.D5, Square.E6),
-    Move(Piece.Queen, Square.D5, Square.F7),
+    Move(Piece.Queen, Square.D5, Square.F7, Piece.Pawn, Square.F7),
     Move(Piece.Queen, Square.D5, Square.E4),
     Move(Piece.Queen, Square.D5, Square.F3),
     Move(Piece.Queen, Square.D5, Square.G2),
@@ -246,13 +241,13 @@ unittest
     Move(Piece.Queen, Square.D5, Square.D7),
     Move(Piece.Queen, Square.D5, Square.D8),
   ]);
+
   assert(actual == expected);
 }
 
 // All
 unittest
 {
-  import std.algorithm;
 
   auto board = Board();
   auto actual = sort(board.moves!(Color.White));
@@ -287,7 +282,6 @@ unittest
 // En Passant
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/8/8/3Pp3/8/8/8/8 w KQkq - 0 1";
   auto board = Board(fen);
@@ -304,7 +298,6 @@ unittest
 // En Passant
 unittest
 {
-  import std.algorithm;
 
   auto fen = "8/8/8/3PpP2/8/8/8/8 w KQkq e6 0 1";
   auto board = Board(fen);
@@ -313,8 +306,8 @@ unittest
   auto expected = sort([
     Move(Piece.Pawn, Square.D5, Square.D6),
     Move(Piece.Pawn, Square.F5, Square.F6),
-    Move(Piece.Pawn, Square.D5, Square.E6),
-    Move(Piece.Pawn, Square.F5, Square.E6)
+    Move(Piece.Pawn, Square.D5, Square.E6, Piece.Pawn, Square.E5),
+    Move(Piece.Pawn, Square.F5, Square.E6, Piece.Pawn, Square.E5)
   ]);
 
   assert(actual == expected);
@@ -323,7 +316,6 @@ unittest
 // Castling all available
 unittest
 {
-  import std.algorithm;
   auto fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
   auto board = Board(fen);
   auto actualWhite = sort(board.moves!(Color.White, Piece.King));
@@ -363,7 +355,6 @@ unittest
 // Castling queenSide in check, kingSide OK
 unittest
 {
-  import std.algorithm;
   auto fen = "r3k2r/8/8/6b1/6B1/8/8/R3K2R w KQkq - 0 1";
   auto board = Board(fen);
   auto actualWhite = sort(board.moves!(Color.White, Piece.King));
@@ -423,3 +414,100 @@ unittest
   assert(start.serialize == e6);
 }
 
+
+// Perft-revealed edge-cases =======================================================
+
+// Can't en passant that reveals a check
+unittest
+{
+  auto fen = "K7/8/8/8/1R3pPk/8/8/8 b - g3 0 1";
+  auto board = Board(fen);
+  auto illegal = Move(Piece.Pawn, Square.F4, Square.G3, Piece.Pawn, Square.G4);
+
+  assert(!board.legal(illegal));
+}
+
+// Mistakenly returning not in check
+unittest
+{
+  auto fen = "8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1";
+  auto board = Board(fen);
+  auto illegal = Move(Piece.Rook, Square.H5, Square.F5);
+  auto actual = sort(board.moves().filter!(move => board.legal(move)).array);
+
+  assert(!board.legal(illegal));
+}
+
+// Can't castle here (even if the FEN says you might be able to):
+unittest
+{
+  auto fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPPBN1PP/RN1QK2n w KQ - 0 8";
+  auto board = Board(fen);
+  auto castleKingside = Move(Piece.King, Square.E1, Square.G1);
+  assert(!board.legal(castleKingside));
+}
+
+// Capturing a rook disallows castling for that side
+unittest
+{
+  auto fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPPBNnPP/RN1QK2R b KQ - 0 8";
+  auto board = Board(fen);
+  auto captureKingside = Move(Piece.Knight, Square.F2, Square.H1, Piece.Rook, Square.H1);
+  board.move(captureKingside);
+  assert(!board.castling[Color.White, Piece.King]);
+}
+
+// Should be able to castle here
+unittest
+{
+  auto fen = "r3k2r/p1pNqpb1/bn2pnp1/3P4/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b KQkq - 0 1";
+  auto board = Board(fen);
+  auto castleQueenside = Move(Piece.King, Square.E8, Square.C8);
+  assert(board.legal(castleQueenside));
+}
+
+// Shouldn't be able to castle here, though
+unittest
+{
+  auto fen = "rr2k2r/p1pNqpb1/bn2pnp1/3P4/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b KQkq - 0 1";
+  auto board = Board(fen);
+  auto castleQueenside = Move(Piece.King, Square.E8, Square.C8);
+  assert(!board.legal(castleQueenside));
+}
+
+
+// moving a rook disallows castling for that rook
+unittest
+{
+  auto pos2FEN = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+  auto board = Board(pos2FEN);
+  auto a1b1Move = Move(Piece.Rook, Square.A1, Square.B1);
+  board.move(a1b1Move);
+  assert(!board.castling[Color.White, Piece.Queen]);
+  assert(board.castling[Color.White, Piece.King]);
+}
+
+// Castling updates the castling appropriately
+unittest
+{
+  auto fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+  auto board = Board(fen);
+  auto move = Move(Piece.King, Square.E1, Square.C1);
+  board.move(move);
+  assert(!board.castling[Color.White, Piece.King]);
+  assert(!board.castling[Color.White, Piece.Queen]);
+}
+
+// Castling queenside moves the rook appropriately.
+unittest
+{
+  auto pos2FEN = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+  auto e1c1 = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/2KR3R b kq - 1 1";
+  auto board = Board(pos2FEN);
+  auto move = Move(Piece.King, Square.E1, Square.C1);
+  assert(move.isCastling);
+  board.move(move);
+
+  auto expectedRook = (1L << Square.D1);
+  assert((board.boards[Color.White][Piece.Rook] & expectedRook) > 0);
+}
