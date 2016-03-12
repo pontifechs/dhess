@@ -26,7 +26,6 @@ enum Column: ubyte
 }
 
 mixin(genSquareEnum());
-
 private string genSquareEnum()
 {
   import std.conv;
@@ -51,5 +50,13 @@ private string genSquareEnum()
 unittest
 {
   assert(Square.A1 == 7);
+  assert(Square.B1 == 6);
+  assert(Square.C1 == 5);
   assert(Square.A8 == 63);
+}
+
+Square square(Row row, Column col)
+{
+  import std.conv;
+  return ((row * 8) + col).to!Square;
 }

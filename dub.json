@@ -11,7 +11,7 @@
             "targetPath" : "test",
             "sourcePaths": ["test/"],
             "importPaths": ["test/"],
-            "excludedSourceFiles": ["test/perft/app.d"]
+            "excludedSourceFiles": ["test/perft/app.d", "test/magic/app.d"]
         }
     ],
     "subPackages" : [
@@ -21,6 +21,14 @@
             "targetPath" : "test/perft/",
             "sourcePaths" : ["test/perft/"],
             "importPaths" : ["test/perft/"],
+            "dependencies": {"dhess":"*"}
+        },
+        {
+            "name" : "magic",
+            "targetType" : "executable",
+            "targetPath" : "test/magic/",
+            "sourcePaths" : ["test/magic/"],
+            "importPaths" : ["test/magic/"],
             "dependencies": {"dhess":"*"}
         }
     ]

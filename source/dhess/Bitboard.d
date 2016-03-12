@@ -163,12 +163,33 @@ unittest
   assert(RANK_1.south == 0L);
 }
 
+
+enum int[64] index64 =[ 
+    0,  1, 48,  2, 57, 49, 28,  3,
+   61, 58, 50, 42, 38, 29, 17,  4,
+   62, 55, 59, 36, 53, 51, 43, 22,
+   45, 39, 33, 30, 24, 18, 12,  5,
+   63, 47, 56, 27, 60, 41, 37, 16,
+   54, 35, 52, 21, 44, 32, 23, 11,
+   46, 26, 40, 15, 34, 20, 31, 10,
+   25, 14, 19,  9, 13,  8,  7,  6
+];
+
 Square LS1B(Bitboard board)
 {
+  import core.bitop;
+  import std.conv;
+  return bsf(board).to!Square;
+  /*
   asm
   {
     bsf RAX, board;
   }
+  import std.conv;
+  ulong debruijn64 = 0x03f79d71b4cb0a89UL;
+  auto index = index64[((board & - board) * debruijn64) >> 58];
+  return index.to!(Square);
+  */
 }
 unittest
 {
@@ -176,7 +197,7 @@ unittest
   assert(ends.LS1B == 1);
   assert(A_8.LS1B == 63);
 }
-
+/*
 Square MS1B(Bitboard board)
 {
   asm
@@ -189,6 +210,7 @@ unittest
   auto ends = B_8 | G_1;
   assert(ends.MS1B == 62);
 }
+*/
 
 Bitboard resetLS1B(Bitboard board)
 {
@@ -283,12 +305,10 @@ unittest
   assert(RANK_1.remove(FILE_A) == rank1MinusA);
 }
 
-ubyte pop(Bitboard board)
+int pop(Bitboard board)
 {
-  asm
-  {
-    popcnt RAX, board;
-  }
+  import core.bitop;
+  return _popcnt(board);
 }
 unittest
 {
@@ -504,8 +524,87 @@ Bitboard bitboard(Row r)
 {
   return 0xFFL << (r * 8);
 }
-
 unittest
 {
   assert(Row._1.bitboard == RANK_1);
+}
+
+
+// Carry-Rippler. See: https://chessprogramming.wikispaces.com/Traversing+Subsets+of+a+Set
+// Pretty nifty.
+Bitboard[] subsets(Bitboard d)
+{
+  Bitboard[] ret;
+  Bitboard n = 0;
+  do {
+    ret ~= n;
+    n = (n - d) & d;
+  } while ( n );
+  return ret;
+}
+
+// Manual
+import std.range;
+Square[][] recursiveSubsets(Square[] range)
+{
+  Square[][] ret = [[]];
+
+  if (range.length == 0)
+  {
+    return ret;
+  }
+
+  for (int i = 0; i < range.length; ++i)
+  {
+
+    auto pop = range[i];
+    auto remainder = range[i+1..$];
+
+    auto subsets = recursiveSubsets(remainder);
+    foreach (subset; subsets)
+    {
+      ret ~= (pop ~ subset);
+    }
+  }
+
+  return ret;
+}
+
+
+unittest
+{
+  import std.algorithm;
+  import std.array;
+
+  Bitboard collapse(Square[] squares)
+  {
+    auto result = 0UL;
+    foreach (sq; squares)
+    {
+      result |= (1UL << sq);
+    }
+    return result;
+  }
+
+  Square[] squaresToSubset = [Square.H1,
+                              Square.G1,
+                              Square.F1,
+                              Square.E1,
+                              Square.D1,
+                              Square.C1,
+                              Square.B1,
+                              Square.A1,
+    ];
+  auto all = collapse(squaresToSubset);
+
+  Square[][] hardSubsets = squaresToSubset.recursiveSubsets;
+
+  auto subsets = all.subsets;
+
+  assert(hardSubsets.length == subsets.length);
+
+  auto hardCollapseds = sort(hardSubsets.map!(arr => collapse(arr)).array).uniq.array;
+  assert(hardCollapseds.length == subsets.length);
+
+  assert(hardCollapseds == subsets);
 }

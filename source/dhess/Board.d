@@ -171,12 +171,12 @@ private:
 
   Bitboard all(Color c)() const
   {
-    auto all = 0L;
-    foreach (b; boards[c])
-    {
-      all |= b;
-    }
-    return all;
+    return boards[c][Piece.King] |
+      boards[c][Piece.Queen] |
+      boards[c][Piece.Knight] |
+      boards[c][Piece.Rook] |
+      boards[c][Piece.Bishop] |
+      boards[c][Piece.Pawn];
   }
 
   Bitboard enemy(Color c)() const
@@ -509,18 +509,19 @@ public:
       auto doubles = (singles & RANK_6).south & empty;
     }
 
-
     while (singles > 0)
     {
       auto sq = singles.LS1B;
-      ret ~= buildMove!(color)((sq - pushDirection).to!Square, sq);
+      auto source = (sq - pushDirection).to!Square;
+      ret ~= buildMove!(color)(source, sq);
       singles = singles.resetLS1B;
     }
 
     while (doubles > 0)
     {
       auto sq = doubles.LS1B;
-      ret ~= buildMove!(color)((sq - 2*pushDirection).to!Square, sq);
+      auto source = (sq - 2*pushDirection).to!Square;
+      ret ~= buildMove!(color)(source, sq);
       doubles = doubles.resetLS1B;
     }
 

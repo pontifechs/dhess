@@ -10,10 +10,11 @@ import std.conv;
 import std.stdio;
 import std.algorithm;
 import std.array;
+import std.parallelism;
 
 ulong perft(Board board, ulong depth)
 {
-  auto count = 0;
+  shared auto count = 0;
 
   // Base case
   if (depth == 0)
@@ -37,15 +38,15 @@ ulong perft(Board board, ulong depth)
       cp.move(move);
 
       // Recurse
-      count += perft(cp, depth - 1);
-
+      auto perft = perft(cp, depth - 1);
+      core.atomic.atomicOp!"+="(count, perft); // Count addition needs to be atomic
     }
     return count;
   }
 }
 
 
-void runPerft(FEN start, long[] values)
+void runPerft(FEN start, ulong[] values)
 {
   auto board = Board(start);
 
@@ -68,10 +69,12 @@ void main()
 {
   import std.datetime;
 
-  /*
   // traditional:
+  /*
   writeln(Clock.currTime());
-  runPerft(START, [20, 400, 8_902, 197_281, 4_865_609, 119_060_324, 3_195_901_860, 84_998_978_956]);
+  //runPerft(START, [20, 400, 8_902, 197_281, 4_865_609, 119_060_324, 3_195_901_860, 84_998_978_956]);
+  runPerft(START, [20, 400, 8_902, 197_281, 4_865_609, 119_060_324]);
+  writeln(Clock.currTime());
   writeln("Traditional Complete!");
 
   writeln(Clock.currTime());
@@ -94,8 +97,9 @@ void main()
   pos6();
   writeln("Pos6 Complete!");
   */
+
   auto board = Board();
-  stockfish(board, 7);
+  stockfish(board, 5);
 }
 
 // Kiwipete
@@ -201,15 +205,14 @@ void stockfish(Board board, int depth = 1)
   import std.algorithm;
   import std.array;
 
-  auto moves = board.moves.filter!(move => board.legal(move)).array;
-  writeln(moves.length);
+  auto moves = board.moves.filter!(
+    move => board.legal(move)
+  ).array;
+
   foreach(move; moves)
   {
-    write(move.source);
-    write(move.destination);
     Board cp = board;
     cp.move(move);
-    write(": ");
-    writeln(perft(cp, depth - 1));
+    writeln(move.source, move.destination, ": ", perft(cp, depth - 1));
   }
 }
