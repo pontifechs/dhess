@@ -248,7 +248,6 @@ unittest
 // All
 unittest
 {
-
   auto board = Board();
   auto actual = sort(board.moves!(Color.White));
 

@@ -3,6 +3,7 @@ module dhess.Board;
 import dhess.Pieces;
 import dhess.Position;
 import dhess.Bitboard;
+import dhess.Magic;
 import dhess.FEN;
 import dhess.Move;
 
@@ -224,22 +225,35 @@ private:
                         kings.northwest);
 
     // Queens
-    auto queens = boards[color][Piece.Queen];
-    auto queenAttacks = (marchMoves(queens, &north) |
-                         marchMoves(queens, &northeast) |
-                         marchMoves(queens, &east) |
-                         marchMoves(queens, &southeast) |
-                         marchMoves(queens, &south) |
-                         marchMoves(queens, &southwest) |
-                         marchMoves(queens, &west) |
-                         marchMoves(queens, &northwest));
+    Bitboard queens = boards[color][Piece.Queen];
+    Bitboard queenAttacks = 0UL;
+    while (queens > 0)
+    {
+      auto source = queens.LS1B;
+
+      auto orthMagicIndex = ((all & OrthogonalRays[source]) * OrthogonalMagics[source]) >> (64 - OrthogonalShifts[source]);
+      auto diagMagicIndex = ((all & DiagonalRays[source]) * DiagonalMagics[source]) >> (64 - DiagonalShifts[source]);
+      auto movesAndAttacks =
+        OrthogonalDatabase[source][orthMagicIndex] |
+        DiagonalDatabase[source][diagMagicIndex]; // Tadahhhh!!!
+      queenAttacks |= movesAndAttacks;
+
+      queens = queens.resetLS1B;
+    }
+
 
     // Bishops
-    auto bishops = boards[color][Piece.Bishop];
-    auto bishopAttacks = (marchMoves(bishops, &northeast) |
-                          marchMoves(bishops, &southeast) |
-                          marchMoves(bishops, &southwest) |
-                          marchMoves(bishops, &northwest));
+    Bitboard bishops = boards[color][Piece.Bishop];
+    Bitboard bishopAttacks = 0UL;
+    while (bishops > 0)
+    {
+      auto source = bishops.LS1B;
+      auto diagMagicIndex = ((all & DiagonalRays[source]) * DiagonalMagics[source]) >> (64 - DiagonalShifts[source]);
+      auto movesAndAttacks = DiagonalDatabase[source][diagMagicIndex]; // Tadahhhh!!!
+      bishopAttacks |= movesAndAttacks;
+
+      bishops = bishops.resetLS1B;
+    }
 
     // Knights
     auto knights = boards[color][Piece.Knight];
@@ -253,82 +267,18 @@ private:
                           knights.northwest.north);
 
     // Rooks
-    auto rooks = boards[color][Piece.Rook];
-    auto rookAttacks = (marchMoves(rooks, &north) |
-                        marchMoves(rooks, &east) |
-                        marchMoves(rooks, &south) |
-                        marchMoves(rooks, &west));
-
-    return (pawnAttacks |
-            kingAttacks |
-            queenAttacks |
-            bishopAttacks |
-            knightAttacks |
-            rookAttacks) & empty;
-  }
-
-  Bitboard attackedPieces(Color color)() const
-  {
-    // Pawns
-    static if (color == Color.White)
+    Bitboard rooks = boards[color][Piece.Rook];
+    auto rookAttacks = 0UL;
+    while (rooks > 0)
     {
-      auto westAttacks = boards[color][Piece.Pawn].northwest & enemy!color;
-      auto eastAttacks = boards[color][Piece.Pawn].northeast & enemy!color;
+      auto sq = rooks.LS1B;
+
+      auto magicIndex = ((all & OrthogonalRays[sq]) * OrthogonalMagics[sq]) >> (64 - OrthogonalShifts[sq]);
+      auto movesAndAttacks = OrthogonalDatabase[sq][magicIndex]; // Tadahhhh!!!
+      rookAttacks |= movesAndAttacks;
+
+      rooks = rooks.resetLS1B;
     }
-    else
-    {
-      auto westAttacks = boards[color][Piece.Pawn].southwest & enemy!color;
-      auto eastAttacks = boards[color][Piece.Pawn].southeast & enemy!color;
-    }
-
-    auto pawnAttacks = westAttacks | eastAttacks;
-
-    // Kings
-    auto kings = boards[color][Piece.King];
-    auto kingAttacks = (kings.north |
-                        kings.northeast |
-                        kings.east |
-                        kings.southeast |
-                        kings.south |
-                        kings.southwest |
-                        kings.west |
-                        kings.northwest) & enemy!color;
-
-    // Queens
-    auto queens = boards[color][Piece.Queen];
-    auto queenAttacks = (marchCollisions(queens, &north) |
-                         marchCollisions(queens, &northeast) |
-                         marchCollisions(queens, &east) |
-                         marchCollisions(queens, &southeast) |
-                         marchCollisions(queens, &south) |
-                         marchCollisions(queens, &southwest) |
-                         marchCollisions(queens, &west) |
-                         marchCollisions(queens, &northwest)) & enemy!color;
-
-    // Bishops
-    auto bishops = boards[color][Piece.Bishop];
-    auto bishopAttacks = (marchCollisions(bishops, &northeast) |
-                          marchCollisions(bishops, &southeast) |
-                          marchCollisions(bishops, &southwest) |
-                          marchCollisions(bishops, &northwest)) & enemy!color;
-
-    // Knights
-    auto knights = boards[color][Piece.Knight];
-    auto knightAttacks = (knights.northeast.north |
-                          knights.northeast.east |
-                          knights.southeast.east |
-                          knights.southeast.south |
-                          knights.southwest.south |
-                          knights.southwest.west |
-                          knights.northwest.west |
-                          knights.northwest.north) & enemy!color;
-
-    // Rooks
-    auto rooks = boards[color][Piece.Rook];
-    auto rookAttacks = (marchCollisions(rooks, &north) |
-                        marchCollisions(rooks, &east) |
-                        marchCollisions(rooks, &south) |
-                        marchCollisions(rooks, &west)) & enemy!color;
 
     return (pawnAttacks |
             kingAttacks |
@@ -336,6 +286,11 @@ private:
             bishopAttacks |
             knightAttacks |
             rookAttacks);
+  }
+
+  Bitboard attackedPieces(Color color)() const
+  {
+    return attackedSquares!(color) & enemy!color;
   }
 
   Bitboard attackedPieces(Color c) const
@@ -729,34 +684,6 @@ public:
     }
   }
 
-  // Sliding -------------------------------------------------------------------
-  alias MoveBitboard = Bitboard function(Bitboard);
-  private Bitboard marchMoves(Bitboard board, MoveBitboard move) const
-  {
-    auto moves = 0L;
-    auto march = board;
-    for (int i = 0; i < 7; ++i)
-    {
-      march = move(march);
-      march = march.remove(march & all);
-      moves |= march;
-    }
-    return moves;
-  }
-
-  private Bitboard marchCollisions(Bitboard board, MoveBitboard move) const
-  {
-    auto attacks = 0L;
-    auto march = board;
-    for (int i = 0; i < 7; ++i)
-    {
-      march = move(march);
-      attacks |= march & all;
-      march = march.remove(march & all);
-    }
-    return attacks;
-  }
-
 
   // Rooks ---------------------------------------------------------------------------------------
   Move[] moves(Color c, Piece p)() const
@@ -771,15 +698,10 @@ public:
       auto sq = rooks.LS1B;
       Bitboard rook = (1L << sq);
 
-      auto moves = marchMoves(rook, &north) |
-        marchMoves(rook, &east) |
-        marchMoves(rook, &south) |
-        marchMoves(rook, &west);
-
-      auto attacks = (marchCollisions(rook, &north) |
-                      marchCollisions(rook, &east) |
-                      marchCollisions(rook, &south) |
-                      marchCollisions(rook, &west)) & enemy!c;
+      auto magicIndex = ((all & OrthogonalRays[sq]) * OrthogonalMagics[sq]) >> (64 - OrthogonalShifts[sq]);
+      auto movesAndAttacks = OrthogonalDatabase[sq][magicIndex]; // Tadahhhh!!!
+      auto moves = movesAndAttacks & empty;
+      auto attacks = movesAndAttacks & enemy!c;
 
       while (moves > 0)
       {
@@ -814,15 +736,10 @@ public:
       auto source = bishops.LS1B;
       auto bishop = (1L << source);
 
-      auto moves = marchMoves(bishop, &northeast) |
-        marchMoves(bishop, &southeast) |
-        marchMoves(bishop, &southwest) |
-        marchMoves(bishop, &northwest);
-
-      auto attacks = (marchCollisions(bishop, &northeast) |
-                      marchCollisions(bishop, &southeast) |
-                      marchCollisions(bishop, &southwest) |
-                      marchCollisions(bishop, &northwest)) & enemy!c;
+      auto magicIndex = ((all & DiagonalRays[source]) * DiagonalMagics[source]) >> (64 - DiagonalShifts[source]);
+      auto movesAndAttacks = DiagonalDatabase[source][magicIndex]; // Tadahhhh!!!
+      auto moves = movesAndAttacks & empty;
+      auto attacks = movesAndAttacks & enemy!c;
 
       while (moves > 0)
       {
@@ -857,23 +774,14 @@ public:
       auto source = queens.LS1B;
       auto queen = (1L << source);
 
-      auto moves = marchMoves(queen, &north) |
-        marchMoves(queen, &northeast) |
-        marchMoves(queen, &east) |
-        marchMoves(queen, &southeast) |
-        marchMoves(queen, &south) |
-        marchMoves(queen, &southwest) |
-        marchMoves(queen, &west) |
-        marchMoves(queen, &northwest);
+      auto orthMagicIndex = ((all & OrthogonalRays[source]) * OrthogonalMagics[source]) >> (64 - OrthogonalShifts[source]);
+      auto diagMagicIndex = ((all & DiagonalRays[source]) * DiagonalMagics[source]) >> (64 - DiagonalShifts[source]);
+      auto movesAndAttacks =
+        OrthogonalDatabase[source][orthMagicIndex] |
+        DiagonalDatabase[source][diagMagicIndex]; // Tadahhhh!!!
 
-      auto collisions = (marchCollisions(queen, &north) |
-                         marchCollisions(queen, &northeast) |
-                         marchCollisions(queen, &east) |
-                         marchCollisions(queen, &southeast) |
-                         marchCollisions(queen, &south) |
-                         marchCollisions(queen, &southwest) |
-                         marchCollisions(queen, &west) |
-                         marchCollisions(queen, &northwest)) & enemy!c;
+      auto moves = movesAndAttacks & empty;
+      auto attacks = movesAndAttacks & enemy!c;
 
       while (moves > 0)
       {
@@ -882,11 +790,11 @@ public:
         moves = moves.resetLS1B;
       }
 
-      while (collisions > 0)
+      while (attacks > 0)
       {
-        auto dest = collisions.LS1B;
+        auto dest = attacks.LS1B;
         ret ~= Move(Piece.Queen, source, dest, on(dest), dest);
-        collisions = collisions.resetLS1B;
+        attacks = attacks.resetLS1B;
       }
 
       queens = queens.resetLS1B;

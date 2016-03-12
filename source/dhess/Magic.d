@@ -23,6 +23,10 @@ private Bitboard[][64] DiagonalAttacks;
 Bitboard[64] OrthogonalMagics;
 Bitboard[64] DiagonalMagics;
 
+// Shifts, indexed by Square
+ulong[64] OrthogonalShifts;
+ulong[64] DiagonalShifts;
+
 // Move database, indexed by Square and Magic (tm)
 Bitboard[][64] OrthogonalDatabase;
 Bitboard[][64] DiagonalDatabase;
@@ -153,6 +157,7 @@ static this()
   for (int i = 0; i < 64; i++)
   {
     auto bits = OrthogonalRays[i].serialize.length;
+    OrthogonalShifts[i] = bits;
     ulong[] lookup = new ulong[pow(2, bits)];
     int ct = 0;
     while(true)
@@ -180,6 +185,7 @@ static this()
   for (int i = 0; i < 64; i++)
   {
     auto bits = DiagonalRays[i].serialize.length;
+    DiagonalShifts[i] = bits;
     ulong[] lookup = new ulong[pow(2, bits)];
     int ct = 0;
     while(true)

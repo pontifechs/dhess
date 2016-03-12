@@ -97,7 +97,6 @@ void main()
   pos6();
   writeln("Pos6 Complete!");
   */
-
   auto board = Board();
   stockfish(board, 5);
 }
